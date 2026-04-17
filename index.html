@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fractal Mandala Visualiser</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="panel">
+  <header>
+    <h1>Fractal Mandala</h1>
+    <button id="toggle" title="Mostra/Nascondi pannello">&#9776;</button>
+  </header>
+
+  <div id="controls">
+    <label>Modalità
+      <select id="mode">
+        <option value="0">Kaleido IFS</option>
+        <option value="1" selected>Giardino Floreale (islimi)</option>
+        <option value="2">Girih Stars</option>
+        <option value="3">Julia Bloom</option>
+        <option value="4">Shamsa (medaglione)</option>
+        <option value="5">Cupola Spirale (Lotfollah)</option>
+        <option value="6">Volta a Spicchi</option>
+        <option value="7">Mihrab (nicchia)</option>
+      </select>
+    </label>
+
+    <label>Simmetria <span data-out="symmetry">8</span>
+      <input type="range" id="symmetry" min="3" max="24" step="1" value="8" />
+    </label>
+
+    <label>Petali <span data-out="petals">6</span>
+      <input type="range" id="petals" min="3" max="16" step="1" value="6" />
+    </label>
+
+    <label>Zoom <span data-out="zoom">1.6</span>
+      <input type="range" id="zoom" min="0.3" max="4.0" step="0.01" value="1.6" />
+    </label>
+
+    <label>Iterazioni <span data-out="iterations">7</span>
+      <input type="range" id="iterations" min="1" max="14" step="1" value="7" />
+    </label>
+
+    <label>Complessità <span data-out="complexity">1.10</span>
+      <input type="range" id="complexity" min="0.50" max="1.80" step="0.01" value="1.10" />
+    </label>
+
+    <label>Velocità <span data-out="speed">0.35</span>
+      <input type="range" id="speed" min="0" max="2" step="0.01" value="0.35" />
+    </label>
+
+    <label>Dettaglio <span data-out="detail">1.00</span>
+      <input type="range" id="detail" min="0.2" max="3" step="0.01" value="1.00" />
+    </label>
+
+    <label>Palette
+      <select id="palette">
+        <option value="0">Persian Blue</option>
+        <option value="1">Azulejo</option>
+        <option value="2">Gold &amp; Cobalt</option>
+        <option value="3">Turquoise Night</option>
+        <option value="4">Monochrome Ink</option>
+        <option value="5" selected>Isfahan Gold</option>
+        <option value="6">Lapis Lazuli</option>
+        <option value="7">Emerald Garden</option>
+      </select>
+    </label>
+
+    <label>Bloom <span data-out="bloom">0.85</span>
+      <input type="range" id="bloom" min="0" max="2" step="0.01" value="0.85" />
+    </label>
+
+    <div class="row">
+      <button id="pause">Pausa</button>
+      <button id="randomize">Random</button>
+      <button id="screenshot">PNG</button>
+    </div>
+
+    <p class="hint">Trascina per ruotare · Scroll per zoom · Doppio click = fullscreen</p>
+  </div>
+</div>
+
+<script src="main.js"></script>
+</body>
+</html>
