@@ -10,6 +10,8 @@
     return;
   }
 
+  gl.getExtension("OES_standard_derivatives");
+
   // ---------- Shaders ----------
   const VERT = `
     attribute vec2 a_pos;
@@ -17,6 +19,7 @@
   `;
 
   const FRAG = `
+    #extension GL_OES_standard_derivatives : enable
     precision highp float;
 
     uniform vec2  u_resolution;
@@ -25,7 +28,6 @@
     uniform float u_zoom;
     uniform float u_iterations;
     uniform float u_complexity;
-    uniform float u_detail;
     uniform float u_bloom;
     uniform float u_palette;
     uniform float u_mode;
@@ -33,8 +35,9 @@
     uniform vec2  u_pan;
     uniform float u_rot;
 
-    #define PI  3.14159265359
-    #define TAU 6.28318530718
+    #define PI   3.14159265359
+    #define TAU  6.28318530718
+    #define GOLD vec3(1.0, 0.82, 0.35)
 
     mat2 rot(float a) {
       float c = cos(a), s = sin(a);
@@ -130,7 +133,8 @@
         acc  += 1.0 / (1.0 + r2 * 4.0);
       }
 
-      float edge = smoothstep(0.02 / u_detail, 0.0, trap);
+      float fwTrap = fwidth(trap);
+      float edge = smoothstep(fwTrap, 0.0, trap);
       float field = acc / u_iterations;
       float lum = field * 0.6 + glow * 0.15 * u_bloom + edge * 0.35;
       vec3 base = pickPalette(u_palette, field * 0.9 + t * 0.05);
@@ -172,10 +176,11 @@
         scale /= s;
       }
 
-      // rim of flowers (anti-aliased)
-      float aa = 1.5 / u_resolution.y;
-      float petalMask = smoothstep(0.02 / u_detail + aa, -aa, d);
-      float stemMask  = smoothstep(0.012 / u_detail + aa, -aa, stemD - 0.008);
+      // rim of flowers (derivative-based AA)
+      float fwD    = fwidth(d);
+      float fwStem = fwidth(stemD);
+      float petalMask = smoothstep(fwD,    -fwD,    d);
+      float stemMask  = smoothstep(fwStem, -fwStem, stemD - 0.008);
 
       // base radial background
       float r = length(uv);
@@ -185,13 +190,13 @@
       // petal color: palette driven by radial distance
       vec3 petalCol = pickPalette(u_palette, 0.6 + 0.3 * sin(r * 3.0 - t * 0.3));
       vec3 stemCol  = vec3(0.20, 0.55, 0.35);   // arabesque green
-      vec3 goldCol  = vec3(1.0, 0.82, 0.35);
+      vec3 goldCol  = GOLD;
 
       vec3 col = bgCol * 0.4;
       col = mix(col, stemCol, stemMask * 0.85);
       col = mix(col, petalCol, petalMask);
       // gold outline on petal edges
-      float outline = smoothstep(0.04 / u_detail, 0.01 / u_detail, abs(d));
+      float outline = smoothstep(0.04, 0.01, abs(d));
       col = mix(col, goldCol, outline * 0.35 * u_bloom);
       return col;
     }
@@ -211,7 +216,7 @@
       float rInRing = fract(r / ringW);
 
       // fold per ring into tile
-      p = kaleido(p, u_symmetry * (1.0 + 0.0 * ring));
+      p = kaleido(p, u_symmetry);
 
       // in-tile position
       float a = atan(p.y, p.x);
@@ -226,10 +231,12 @@
       float poly = sdPolygon(local * 4.0, u_symmetry, (R + 0.12) * 4.0) * 0.25;
 
       // interlacing line
-      float line = abs(poly) - 0.01 / u_detail;
+      float line = abs(poly) - 0.01;
 
-      float starMask = smoothstep(0.01, -0.01, star);
-      float lineMask = smoothstep(0.005, -0.005, line);
+      float fwStar = fwidth(star);
+      float fwLine = fwidth(line);
+      float starMask = smoothstep(fwStar, -fwStar, star);
+      float lineMask = smoothstep(fwLine, -fwLine, line);
 
       // iterate: nested smaller stars
       vec2 q = local;
@@ -240,7 +247,8 @@
         q = rot(PI / u_symmetry) * q;
         nested = min(nested, sdStar(q * 8.0, u_symmetry, 0.3) * 0.125);
       }
-      float nestedMask = smoothstep(0.005, -0.005, nested);
+      float fwNested = fwidth(nested);
+      float nestedMask = smoothstep(fwNested, -fwNested, nested);
 
       vec3 base   = pickPalette(u_palette, 0.1 + ring * 0.1 + t * 0.03);
       vec3 starC  = pickPalette(u_palette, 0.65 + t * 0.05);
@@ -279,7 +287,7 @@
       float m = smoothIter / (u_iterations * 5.0);
 
       vec3 base = pickPalette(u_palette, m + t * 0.05);
-      vec3 gold = vec3(1.0, 0.82, 0.35);
+      vec3 gold = GOLD;
       float trapGlow = exp(-trap * 3.0);
       return base * (0.3 + m * 0.7) + gold * trapGlow * 0.4 * u_bloom;
     }
@@ -311,7 +319,8 @@
       arch       = max(arch, -pl.y + 0.08);     // floor cut
       arch       = max(arch, r - 1.05);          // clip outside dome
 
-      float insideArch = smoothstep(0.005, -0.005, arch);
+      float fwArch = fwidth(arch);
+      float insideArch = smoothstep(fwArch, -fwArch, arch);
 
       // Fractal floral fill per panel (phase offset for variety)
       vec2  fp    = pl * 3.4 + vec2(sid * 1.37, 0.0);
@@ -326,7 +335,8 @@
         scale /= 1.22;
         dflor = min(dflor, sdRose(fp, u_petals) * scale);
       }
-      float florMask = smoothstep(0.04 / u_detail, -0.04 / u_detail, dflor) * insideArch;
+      float fwFlor = fwidth(dflor);
+      float florMask = smoothstep(fwFlor, -fwFlor, dflor) * insideArch;
 
       // Gold seams between panels (angular) + arch outline
       float seamD    = abs(la) * max(r, 0.12);
@@ -339,7 +349,7 @@
       vec3 bg     = pickPalette(u_palette, 0.08);
       vec3 panelC = pickPalette(u_palette, 0.30 + sid * 0.11 + t * 0.03);
       vec3 florC  = pickPalette(u_palette, 0.65 + 0.1 * sin(sid));
-      vec3 gold   = vec3(1.0, 0.82, 0.35);
+      vec3 gold   = GOLD;
 
       vec3 col = bg * 0.30;
       col = mix(col, panelC * 0.55, insideArch);
@@ -365,7 +375,8 @@
       float arch = max(arcL, arcR);
       arch       = max(arch, -p.y - 0.75);
 
-      float insideNiche = smoothstep(0.005, -0.005, arch);
+      float fwArch = fwidth(arch);
+      float insideNiche = smoothstep(fwArch, -fwArch, arch);
       float frameInner  = smoothstep(0.014, 0.002, abs(arch));
       float frameOuter  = smoothstep(0.015, 0.002, abs(arch + 0.045));
 
@@ -385,23 +396,27 @@
         vine = min(vine, stem);
         flor = min(flor, sdRose(fp * 0.7, u_petals) * scale);
       }
-      float vineMask = smoothstep(0.028 / u_detail, 0.0, vine) * insideNiche;
-      float florMask = smoothstep(0.040 / u_detail, -0.005, flor) * insideNiche;
+      float fwVine = fwidth(vine);
+      float fwFlor = fwidth(flor);
+      float vineMask = smoothstep(fwVine, 0.0, vine) * insideNiche;
+      float florMask = smoothstep(fwFlor, -fwFlor, flor) * insideNiche;
 
       // Central cartouche (medallion + vase)
       vec2  cp    = p - vec2(0.0, -0.12);
       float dia   = abs(cp.x) * 1.8 + abs(cp.y) * 1.1 - 0.17;
-      float diaMask = smoothstep(0.010, -0.010, dia) * insideNiche;
+      float fwDia = fwidth(dia);
+      float diaMask = smoothstep(fwDia, -fwDia, dia) * insideNiche;
       float diaLine = smoothstep(0.018, 0.0, abs(dia))  * insideNiche;
 
       // Lower vase suggestion (small diamond below cartouche)
       vec2  vp     = p - vec2(0.0, -0.45);
       float vase   = abs(vp.x) * 2.2 + abs(vp.y) * 1.6 - 0.10;
-      float vMask  = smoothstep(0.010, -0.010, vase) * insideNiche;
+      float fwVase = fwidth(vase);
+      float vMask  = smoothstep(fwVase, -fwVase, vase) * insideNiche;
 
       vec3 cobalt  = pickPalette(u_palette, 0.10);
       vec3 bgOut   = pickPalette(u_palette, 0.22);
-      vec3 gold    = vec3(1.00, 0.82, 0.35);
+      vec3 gold    = GOLD;
       vec3 goldDim = vec3(0.78, 0.60, 0.22);
       vec3 green   = vec3(0.30, 0.65, 0.45);
       vec3 turq    = vec3(0.25, 0.75, 0.80);
@@ -451,16 +466,18 @@
       // edge lattice
       float edge = abs(sdTile);
 
-      float tileMask = smoothstep(0.01, -0.01, sdTile);
+      float fwTile = fwidth(sdTile);
+      float fwRose = fwidth(rose);
+      float tileMask = smoothstep(fwTile, -fwTile, sdTile);
       float edgeMask = smoothstep(0.020, 0.002, edge);
-      float roseMask = smoothstep(0.02, -0.02, rose) * tileMask;
+      float roseMask = smoothstep(fwRose, -fwRose, rose) * tileMask;
 
       // perspective: center darker (vanishing point), rim brighter
       float depth = smoothstep(0.02, 0.8, r);
 
       vec3 bg    = pickPalette(u_palette, 0.08);
       vec3 tileC = pickPalette(u_palette, 0.32 + id.y * 0.03 + 0.05 * sin(id.x * 1.7));
-      vec3 gold  = vec3(1.00, 0.82, 0.35);
+      vec3 gold  = GOLD;
       vec3 core  = pickPalette(u_palette, 0.72);
 
       vec3 col = bg * (0.20 + 0.45 * depth);
@@ -494,8 +511,8 @@
         scale *= 0.55 * u_complexity;
       }
 
-      float aa = 1.5 / u_resolution.y;
-      float lineMask = smoothstep(0.015 / u_detail + aa, 0.0, d);
+      float fwD = fwidth(d);
+      float lineMask = smoothstep(fwD, 0.0, d);
 
       // inner glow
       float core = smoothstep(0.6, 0.0, r);
@@ -581,7 +598,6 @@
     zoom:        gl.getUniformLocation(prog, "u_zoom"),
     iterations:  gl.getUniformLocation(prog, "u_iterations"),
     complexity:  gl.getUniformLocation(prog, "u_complexity"),
-    detail:      gl.getUniformLocation(prog, "u_detail"),
     bloom:       gl.getUniformLocation(prog, "u_bloom"),
     palette:     gl.getUniformLocation(prog, "u_palette"),
     mode:        gl.getUniformLocation(prog, "u_mode"),
@@ -598,7 +614,6 @@
     iterations: 7,
     complexity: 1.10,
     speed:      0.35,
-    detail:     1.00,
     bloom:      0.85,
     petals:     6,
     palette:    5,      // Isfahan Gold
@@ -621,6 +636,8 @@
 
   let timeAccum = 0;
   let lastFrame = performance.now();
+  let dirty     = true;
+  const markDirty = () => { dirty = true; };
 
   // ---------- Resize ----------
   function resize() {
@@ -631,6 +648,7 @@
       canvas.width  = w;
       canvas.height = h;
       gl.viewport(0, 0, w, h);
+      markDirty();
     }
   }
   window.addEventListener("resize", resize);
@@ -655,6 +673,7 @@
         const isFloat = el.step && String(el.step).includes(".");
         out.textContent = isFloat ? (+el.value).toFixed(2) : String(parseInt(el.value, 10));
       }
+      markDirty();
     };
     el.addEventListener("input", update);
     update();
@@ -665,12 +684,12 @@
   bindRange("iterations", "iterations", parseInt);
   bindRange("complexity", "complexity");
   bindRange("speed",      "speed");
-  bindRange("detail",     "detail");
   bindRange("bloom",      "bloom");
   if ($("petals")) bindRange("petals", "petals", parseInt);
 
   $("palette").addEventListener("change", e => {
     state.palette = parseInt(e.target.value, 10);
+    markDirty();
   });
 
   if ($("mode")) {
@@ -679,8 +698,6 @@
       const preset = modePresets[state.mode];
       if (preset) {
         for (const k in preset) setControl(k, preset[k]);
-        $("palette").value = preset.palette;
-        state.palette = preset.palette;
       }
     });
   }
@@ -697,16 +714,15 @@
     setControl("iterations", Math.floor(rnd(4, 11)));
     setControl("zoom",       rnd(0.8, 2.5).toFixed(2));
     setControl("speed",      rnd(0.1, 0.8).toFixed(2));
-    setControl("detail",     rnd(0.6, 1.8).toFixed(2));
     setControl("bloom",      rnd(0.4, 1.3).toFixed(2));
     if ($("petals")) setControl("petals", Math.floor(rnd(3, 12)));
     const paletteEl = $("palette");
-    paletteEl.selectedIndex = Math.floor(Math.random() * paletteEl.options.length);
-    state.palette = paletteEl.selectedIndex;
+    setControl("palette", Math.floor(Math.random() * paletteEl.options.length));
   });
 
   $("screenshot").addEventListener("click", () => {
     canvas.toBlob(b => {
+      if (!b) return;
       const a = document.createElement("a");
       a.href = URL.createObjectURL(b);
       a.download = `fractal_${Date.now()}.png`;
@@ -738,6 +754,7 @@
       state.pan[0] -= dx * s * 2;
       state.pan[1] += dy * s * 2;
     }
+    markDirty();
   });
   canvas.addEventListener("pointerup",   () => { dragging = false; });
   canvas.addEventListener("pointerleave",() => { dragging = false; });
@@ -758,23 +775,27 @@
   function frame(now) {
     const dt = (now - lastFrame) * 0.001;
     lastFrame = now;
-    if (!state.paused) timeAccum += dt * state.speed;
+    if (!state.paused) {
+      timeAccum += dt * state.speed;
+      dirty = true;
+    }
 
-    gl.uniform2f(U.resolution, canvas.width, canvas.height);
-    gl.uniform1f(U.time,       timeAccum);
-    gl.uniform1f(U.symmetry,   state.symmetry);
-    gl.uniform1f(U.zoom,       state.zoom);
-    gl.uniform1f(U.iterations, state.iterations);
-    gl.uniform1f(U.complexity, state.complexity);
-    gl.uniform1f(U.detail,     state.detail);
-    gl.uniform1f(U.bloom,      state.bloom);
-    gl.uniform1f(U.palette,    state.palette);
-    gl.uniform1f(U.mode,       state.mode);
-    gl.uniform1f(U.petals,     state.petals);
-    gl.uniform2f(U.pan,        state.pan[0], state.pan[1]);
-    gl.uniform1f(U.rot,        state.rot);
-
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    if (dirty) {
+      gl.uniform2f(U.resolution, canvas.width, canvas.height);
+      gl.uniform1f(U.time,       timeAccum);
+      gl.uniform1f(U.symmetry,   state.symmetry);
+      gl.uniform1f(U.zoom,       state.zoom);
+      gl.uniform1f(U.iterations, state.iterations);
+      gl.uniform1f(U.complexity, state.complexity);
+      gl.uniform1f(U.bloom,      state.bloom);
+      gl.uniform1f(U.palette,    state.palette);
+      gl.uniform1f(U.mode,       state.mode);
+      gl.uniform1f(U.petals,     state.petals);
+      gl.uniform2f(U.pan,        state.pan[0], state.pan[1]);
+      gl.uniform1f(U.rot,        state.rot);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      dirty = false;
+    }
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
