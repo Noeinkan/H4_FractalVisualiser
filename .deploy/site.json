@@ -1,7 +1,7 @@
 {
   "slug": "fractal",
   "domain": "fractal.77.42.70.26.nip.io",
-  "repo": "git@github-site-fractal:Noeinkan/H4_FractalVisualiser.git",
+  "repo": "https://github.com/Noeinkan/H4_FractalVisualiser.git",
   "ref": "main",
   "type": "static",
   "buildCommand": null,
