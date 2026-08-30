@@ -533,6 +533,224 @@
     }
 
     // =================================================================
+    //  FLAT-INK TOOLKIT (modes 8+)
+    //  These modes are illustration, not light: flat fills, a constant-width
+    //  ink stroke, a paper ground. main() skips the tonemap and the vignette
+    //  for them -- x/(1+1.2x) would turn white paper into 0.45 grey -- so the
+    //  colours below are already display values, not linear radiance.
+    // =================================================================
+    struct Ink { vec3 line; vec3 paper; vec3 c1; vec3 c2; vec3 c3; };
+
+    // Same eight slots as pickPalette, flattened: each gradient becomes an
+    // ink + paper + three flat fills. 0 and 5 are the two reference plates.
+    Ink inkPalette(float idx) {
+      if      (idx < 0.5) return Ink(vec3(0.17,0.29,0.46), vec3(0.94,0.95,0.94), vec3(0.95,0.53,0.37), vec3(0.66,0.73,0.69), vec3(0.11,0.53,0.55));
+      else if (idx < 1.5) return Ink(vec3(0.12,0.31,0.55), vec3(0.96,0.96,0.94), vec3(0.29,0.53,0.78), vec3(0.81,0.88,0.93), vec3(0.94,0.76,0.29));
+      else if (idx < 2.5) return Ink(vec3(0.79,0.64,0.15), vec3(0.07,0.14,0.36), vec3(0.11,0.25,0.56), vec3(0.91,0.84,0.54), vec3(0.18,0.44,0.71));
+      else if (idx < 3.5) return Ink(vec3(0.04,0.23,0.27), vec3(0.92,0.96,0.95), vec3(0.16,0.66,0.66), vec3(0.50,0.82,0.78), vec3(0.95,0.65,0.35));
+      else if (idx < 4.5) return Ink(vec3(0.10,0.10,0.10), vec3(0.98,0.98,0.98), vec3(0.85,0.85,0.85), vec3(0.67,0.67,0.67), vec3(0.43,0.43,0.43));
+      else if (idx < 5.5) return Ink(vec3(0.95,0.79,0.30), vec3(0.99,0.99,0.97), vec3(0.91,0.25,0.16), vec3(0.24,0.44,0.49), vec3(0.66,0.81,0.88));
+      else if (idx < 6.5) return Ink(vec3(0.09,0.19,0.48), vec3(0.95,0.96,0.98), vec3(0.18,0.44,0.82), vec3(0.50,0.70,0.91), vec3(0.88,0.77,0.42));
+      else                return Ink(vec3(0.08,0.27,0.18), vec3(0.95,0.97,0.94), vec3(0.18,0.56,0.36), vec3(0.62,0.82,0.66), vec3(0.85,0.66,0.24));
+    }
+
+    // Flat compositing: paint covers paint. No additive light anywhere in an
+    // ink mode, otherwise overlapping bands blow out to white.
+    void over(inout vec3 col, vec3 c, float m) { col = mix(col, c, clamp(m, 0.0, 1.0)); }
+
+    float fillMask(float d)          { float e = FW(d); return smoothstep(e, -e, d); }
+    float lineMask(float d, float w) { float e = FW(d); return smoothstep(e, -e, abs(d) - w); }
+
+    float sdSegment(vec2 p, vec2 a, vec2 b) {
+      vec2 pa = p - a, ba = b - a;
+      float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+      return length(pa - ba * h);
+    }
+
+    // Pointed leaf / lotus petal: half-width w at the waist, tips at (0, +-h).
+    // A width profile rather than a true lens: the two-circle construction
+    // silently inverts when h < w, which is the common case out at the rim
+    // where cells are wider than the band is deep.
+    float sdLeaf(vec2 p, float w, float h) {
+      float ty = clamp(1.0 - abs(p.y) / max(h, 1e-4), 0.0, 1.0);
+      float d  = max(abs(p.x) - w * pow(ty, 0.55), abs(p.y) - h);
+      return d * 0.7;   // crude Lipschitz correction, keeps FW() antialiasing sane
+    }
+
+    // Teardrop / paisley as a cardioid: bulb at -y, cusp at +y. Polar radius,
+    // not a true distance, so it is scaled down to keep FW() antialiasing sane.
+    float sdDrop(vec2 p, float R) {
+      float a = atan(p.x, p.y);
+      return (length(p) - R * (1.0 - 0.70 * cos(a))) * 0.45;
+    }
+
+    // Distance to the nearest of a family of concentric hairlines.
+    float sdRings(vec2 p, float s) {
+      return abs(fract(length(p) / s - 0.5) - 0.5) * s;
+    }
+
+    // Parallel hairlines along direction 'a'; call twice to cross-hatch.
+    float sdHatch(vec2 p, float s, float a) {
+      float u = dot(p, vec2(cos(a), sin(a)));
+      return abs(fract(u / s - 0.5) - 0.5) * s;
+    }
+
+    // Log-spiral scroll, the henna "curl". Same polar caveat as sdDrop.
+    float sdCurl(vec2 p, float k) {
+      float r = max(length(p), 1e-4);
+      float n = (log(r) / k - atan(p.y, p.x)) / TAU;
+      return abs(fract(n + 0.5) - 0.5) * TAU * k * r;
+    }
+
+    // Local frame inside one angular cell of a band.
+    //   .x  across the cell, -1 at one seam and +1 at the other
+    //   .y  outward across the band, 0 at r0 and 1 at r1
+    //   .z  the cell aspect (band width / cell half-arc)
+    // Normalising x to the *cell* and not to the band is what makes motifs
+    // tile: sized against the band they leave paper gaps at every seam.
+    vec3 bandCell(vec2 p, float n, float r0, float r1) {
+      float seg  = TAU / n;
+      float la   = mod(atan(p.y, p.x) + seg * 0.5, seg) - seg * 0.5;
+      float rr   = length(p);
+      float bw   = max(r1 - r0, 1e-3);
+      float ha   = max(seg * 0.25 * (r0 + r1), 1e-4);
+      return vec3(la * rr / ha, (rr - r0) / bw, bw / ha);
+    }
+
+    // Cell coordinates squared up to the x unit, so a motif can be authored
+    // once against x in [-1,1] and follow the band's proportions through asp.
+    vec2 cellBox(vec3 c) { return vec2(c.x, (c.y - 0.5) * c.z); }
+
+    float bandMask(float rr, float r0, float r1) {
+      return fillMask(max(r0 - rr, rr - r1));
+    }
+
+    // =================================================================
+    //  MODE 8 - Henna (flat vector mandala: concentric bands of motifs)
+    //  Not a fractal. Each band carries its own symmetry count and its own
+    //  motif, the way the drawn originals are built; u_iterations decides
+    //  how many bands are laid down, from the medallion outward. Bands are
+    //  contiguous out to r=1.30 so the plate reads as one disc.
+    // =================================================================
+    vec3 modeHenna(vec2 uv, float t) {
+      Ink ink = inkPalette(u_palette);
+      vec3 col = ink.paper;
+
+      vec2  p  = uv;
+      float rr = length(p);
+      float n  = max(u_symmetry, 4.0);
+      float k  = clamp(u_complexity, 0.6, 1.6);    // motif density
+      float bands = clamp(u_iterations, 1.0, 8.0);
+
+      // Stroke weight lives in scene units; each band converts it into its own
+      // cell units below, so the line reads the same thickness everywhere.
+      float w = 0.0040 * (0.5 + 0.8 * u_bloom);
+
+      // ---- band 0: medallion, white spokes on a disc ---------------
+      over(col, ink.c3, fillMask(rr - 0.24));
+      vec3 c0 = bandCell(p, n * 4.0, 0.12, 0.24);
+      over(col, ink.paper, fillMask(abs(c0.x) - 0.45) * bandMask(rr, 0.125, 0.235));
+      over(col, ink.paper, fillMask(rr - 0.075));
+      over(col, ink.line,  fillMask(rr - 0.020));
+      vec3 d0 = bandCell(p, n, 0.070, 0.130);
+      over(col, ink.line,  fillMask(length(cellBox(d0)) - 0.30));
+      over(col, ink.line,  lineMask(rr - 0.24, w));
+
+      // ---- band 1: inner flame ring --------------------------------
+      if (bands > 1.5) {
+        float m = bandMask(rr, 0.24, 0.42);
+        over(col, ink.c1, m);
+        vec3  c = bandCell(p, n * 3.0, 0.24, 0.42);
+        vec2  e = cellBox(c);
+        float lw = w * c.z / 0.18;
+        float flame = sdLeaf(e, 0.88, 0.44 * c.z);
+        over(col, ink.line, lineMask(flame, lw) * m);
+        over(col, ink.line, lineMask(sdCurl(e * 1.6, 0.30 / k), lw * 0.8) * fillMask(flame) * m);
+        over(col, ink.line, lineMask(rr - 0.42, w));
+      }
+
+      // ---- band 2: scroll collar -----------------------------------
+      if (bands > 2.5) {
+        float m = bandMask(rr, 0.42, 0.58);
+        over(col, ink.c1, m);
+        vec3  c = bandCell(p, n * 4.0, 0.42, 0.58);
+        vec2  e = cellBox(c);
+        float lw = w * c.z / 0.16;
+        over(col, ink.line, lineMask(sdRings(e * vec2(1.0, 0.8), 0.30 / k), lw * 0.9) * m);
+        over(col, ink.line, lineMask(sdLeaf(e, 0.90, 0.46 * c.z), lw) * m);
+        over(col, ink.line, lineMask(rr - 0.58, w));
+      }
+
+      // ---- band 3: chevron collar ----------------------------------
+      if (bands > 3.5) {
+        float m = bandMask(rr, 0.58, 0.66);
+        over(col, ink.paper, m);
+        vec3  c = bandCell(p, n * 4.0, 0.58, 0.66);
+        vec2  e = cellBox(c);
+        // triangle standing on the inner edge, apex outward
+        float hh  = 0.44 * c.z;
+        float tri = max(abs(e.x) * (hh / 0.55) + e.y - hh, -e.y - hh);
+        over(col, ink.line, fillMask(tri) * m);
+        over(col, ink.line, lineMask(rr - 0.66, w));
+      }
+
+      // ---- band 4: teardrops with a ringed eye ---------------------
+      if (bands > 4.5) {
+        float m = bandMask(rr, 0.66, 0.86);
+        over(col, ink.c2, m);
+        vec3  c = bandCell(p, n * 2.0, 0.66, 0.86);
+        vec2  e = cellBox(c);
+        float lw = w * c.z / 0.20;
+        float R  = min(0.45 * c.z, 0.86);
+        float drop = sdDrop(vec2(e.x, -e.y - 0.20 * R), R);
+        over(col, ink.paper, fillMask(drop) * m);
+        over(col, ink.line,  lineMask(sdRings(vec2(e.x, e.y + 0.30 * R), 0.22 * R), lw * 0.8) * fillMask(drop) * m);
+        over(col, ink.line,  lineMask(drop, lw) * m);
+        over(col, ink.line,  lineMask(rr - 0.86, w));
+      }
+
+      // ---- band 5: lotus petals ------------------------------------
+      if (bands > 5.5) {
+        float m = bandMask(rr, 0.86, 1.08);
+        over(col, ink.paper, m);
+        vec3  c = bandCell(p, n * 2.0, 0.86, 1.08);
+        vec2  e = cellBox(c);
+        float lw = w * c.z / 0.22;
+        float petal = sdLeaf(e, 0.96, 0.47 * c.z);
+        over(col, ink.c1,   fillMask(petal) * m);
+        over(col, ink.line, lineMask(sdLeaf(e, 0.58, 0.30 * c.z), lw * 0.8) * m);
+        over(col, ink.line, lineMask(petal, lw) * m);
+      }
+
+      // ---- band 6: outer leaves, cross-hatched ---------------------
+      if (bands > 6.5) {
+        float m = bandMask(rr, 1.08, 1.30);
+        over(col, ink.c3, m);
+        vec3  c = bandCell(p, n * 2.0, 1.08, 1.30);
+        vec2  e = cellBox(c);
+        float lw = w * c.z / 0.22;
+        float leaf = sdLeaf(e, 0.94, 0.46 * c.z);
+        over(col, ink.paper, fillMask(leaf) * m);
+        float hatch = min(sdHatch(e, 0.20 / k, 0.9), sdHatch(e, 0.20 / k, -0.9));
+        over(col, ink.line, lineMask(hatch, lw * 0.55) * fillMask(leaf) * m);
+        over(col, ink.line, lineMask(leaf, lw) * m);
+        over(col, ink.line, lineMask(rr - 1.30, w));
+      }
+
+      // ---- band 7: crown of dotted stalks --------------------------
+      if (bands > 7.5) {
+        vec3  c = bandCell(p, n * 4.0, 1.30, 1.46);
+        vec2  e = vec2(c.x, c.y);
+        float g = step(1.29, rr);
+        float stalk = min(sdSegment(e, vec2(0.0, 0.0), vec2(0.0, 0.62)) - 0.10,
+                          length(vec2(e.x, (e.y - 0.74) * c.z)) - 0.26);
+        over(col, ink.line, fillMask(stalk) * g);
+      }
+
+      return col;
+    }
+
+    // =================================================================
     void main() {
       vec2 res = u_resolution;
 
@@ -553,16 +771,22 @@
       else if (u_mode < 4.5) col = modeShamsa (uv, t);
       else if (u_mode < 5.5) col = modeDome   (uv, t);
       else if (u_mode < 6.5) col = modeVault  (uv, t);
-      else                   col = modeMihrab (uv, t);
+      else if (u_mode < 7.5) col = modeMihrab (uv, t);
+      else                   col = modeHenna  (uv, t);
 
-      // Vignette in screen space: independent of zoom / pan, so the corners no
-      // longer go fully black once u_zoom pushes uv past the old smoothstep edge.
-      // Edges chosen to match the previous look at the default zoom of 1.6.
-      col *= smoothstep(2.2, 0.3, length(uvScreen));
+      // Light modes only. The flat-ink modes (8+) author display-ready colours:
+      // the tonemap would crush white paper to 0.45 grey and the vignette would
+      // dirty the ground, so both are skipped rather than duplicated per mode.
+      if (u_mode < 7.5) {
+        // Vignette in screen space: independent of zoom / pan, so the corners no
+        // longer go fully black once u_zoom pushes uv past the old smoothstep edge.
+        // Edges chosen to match the previous look at the default zoom of 1.6.
+        col *= smoothstep(2.2, 0.3, length(uvScreen));
 
-      // soft tonemap + gentle gamma
-      col = col / (1.0 + col * (1.2 - 0.6 * u_bloom));
-      col = pow(max(col, 0.0), vec3(0.92));
+        // soft tonemap + gentle gamma
+        col = col / (1.0 + col * (1.2 - 0.6 * u_bloom));
+        col = pow(max(col, 0.0), vec3(0.92));
+      }
 
       gl_FragColor = vec4(col, 1.0);
     }

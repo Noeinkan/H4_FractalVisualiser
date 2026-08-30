@@ -145,7 +145,7 @@
 
   // Highest iteration count each mode actually consumes (its shader loop bound).
   // Beyond these the slider would be inert, so the control's max follows the mode.
-  const MODE_ITER_MAX = { 0: 16, 1: 10, 2: 7, 3: 12, 4: 8, 5: 8, 6: 8, 7: 10 };
+  const MODE_ITER_MAX = { 0: 16, 1: 10, 2: 7, 3: 12, 4: 8, 5: 8, 6: 8, 7: 10, 8: 8 };
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -175,6 +175,9 @@
     5: { symmetry: 14, iterations: 5,  complexity: 1.00, zoom: 1.2, palette: 2, petals: 5 },
     6: { symmetry:  8, iterations: 6,  complexity: 1.00, zoom: 1.4, palette: 5, petals: 6 },
     7: { symmetry:  6, iterations: 8,  complexity: 1.05, zoom: 1.3, palette: 5, petals: 5 },
+    // Henna is a poster, not an animation: speed 0 so the plate stays put,
+    // and a zoom wide enough to hold all eight bands (outermost r ~ 1.6).
+    8: { symmetry:  8, iterations: 8,  complexity: 1.00, zoom: 3.2, palette: 0, petals: 6, speed: 0 },
   };
 
   let timeAccum = 0;
@@ -352,7 +355,7 @@
   function applyState(o) {
     if (!o || !Object.keys(o).length) return false;
     restoring = true;
-    if ("m" in o) applyMode(clamp(Math.round(o.m), 0, 7), false);
+    if ("m" in o) applyMode(clamp(Math.round(o.m), 0, 8), false);
     for (const key in HASH_MAP) {
       if (key in o) setControl(HASH_MAP[key], o[key]);
     }

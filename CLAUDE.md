@@ -1,6 +1,6 @@
 # Fractal Mandala Visualiser
 
-Visualizzatore WebGL di mandala frattali ispirati alla geometria islamica: otto
+Visualizzatore WebGL di mandala ispirati alla geometria islamica: nove
 modalità di rendering GLSL, palette e simmetrie regolabili dal vivo, e un
 permalink nell'URL che descrive per intero la vista corrente.
 
@@ -58,6 +58,18 @@ Per screenshot riproducibili usa la skill `screenshot-kit` con
 - **Il flag `restoring`** sopprime l'applicazione dei preset e la riscrittura
   dell'URL mentre si carica uno stato. Ogni nuovo percorso che chiama
   `setControl` o `applyMode` durante un restore deve rispettarlo.
+- **Le modalità dalla 8 in su sono illustrazione, non luce.** Campiture piatte,
+  tratto di spessore costante, fondo carta. `main()` salta tonemap e vignette
+  per loro — `x/(1+1.2x)` porterebbe il bianco a 0.45 di grigio — quindi i
+  colori di `inkPalette` sono già valori da display, non radianza lineare. Nelle
+  modalità inchiostro `u_bloom` non è un bagliore: è il **peso del tratto**, e
+  la composizione deve restare `mix()`, mai additiva.
+- **In `modeHenna` le celle si normalizzano sulla cella, non sulla banda.**
+  `bandCell` ritorna x in [-1,1] sulla cella e l'aspetto in `.z`: un motivo
+  dimensionato sulla larghezza della banda lascia carta vuota a ogni giunzione.
+  E `sdLeaf` è un profilo di larghezza, non una lente fra due cerchi: quella
+  costruzione si inverte silenziosamente quando la foglia è più larga che alta,
+  che è il caso normale sulle corone esterne.
 - **Il rendering è on-demand**: `render()` esce subito se `dirty` è falso. Ogni
   cambiamento di stato deve chiamare `markDirty()`, altrimenti non si vede nulla
   finché l'animazione non è in pausa... e in pausa non si vede proprio.

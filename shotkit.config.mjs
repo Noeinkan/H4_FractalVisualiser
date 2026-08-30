@@ -137,6 +137,26 @@ export default {
       alt: 'A grey and gold monochrome dome of oval tiles receding into the distance'
     },
     {
+      name: '08-henna-navy',
+      // v=0 on purpose: mode 8 is a plate, not an animation, and any speed
+      // spins it. z=3.2 is the framing that just holds the outer crown (r~1.46).
+      path: hash({ m: 8, s: 8, p: 6, i: 8, z: 3.2, c: 1, v: 0, b: 0.85, g: 0, x: 0, y: 0, r: 0 }),
+      waitFor: '#gl',
+      prepare: fresh(true),
+      shows: 'Henna — the flat-ink mandala mode: eight concentric bands, each with its own symmetry count and motif, drawn as flat fills with a constant-width outline instead of the glow used by modes 0-7; Persian Blue',
+      alt: 'A navy, coral and sage mandala of concentric petal and teardrop rings on off-white paper'
+    },
+    {
+      name: '09-henna-saffron',
+      // same plate, palette 5: the two reference plates differ only in colour,
+      // which is the point of keeping the ink scheme separate from the geometry.
+      path: hash({ m: 8, s: 10, p: 6, i: 8, z: 3.2, c: 1.2, v: 0, b: 0.85, g: 5, x: 0, y: 0, r: 0 }),
+      waitFor: '#gl',
+      prepare: fresh(true),
+      shows: 'the same Henna plate at ten-fold symmetry in Isfahan Gold — showing that in the ink modes the palette swaps flat fills rather than shifting a gradient',
+      alt: 'A saffron, red and teal mandala of concentric petal rings on cream paper'
+    },
+    {
       name: '08-randomize',
       path: hash({ m: 5, s: 12, p: 5, i: 6, z: 1.2, c: 1, v: 0.7, b: 1, g: 2, x: 0, y: 0, r: 0 }),
       waitFor: '#gl',

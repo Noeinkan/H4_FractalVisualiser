@@ -54,7 +54,11 @@ IIFE che espone `window.FRACTAL_SHADER = { VERT, FRAG_BODY }`. `FRAG_BODY`
 | [360](shader.js#L360) | `modeMihrab` — modalità 7, **incompleta** |
 | [433](shader.js#L433) | `modeDome` — modalità 5, spirale a cupola |
 | [499](shader.js#L499) | `modeShamsa` — modalità 4, medaglione |
-| [536](shader.js#L536) | `main()` — pan/zoom/rotazione, dispatch, vignette, tonemap |
+| [536](shader.js#L536) | toolkit inchiostro piatto: `Ink`, `inkPalette`, `over`, `fillMask`, `lineMask` |
+| [566](shader.js#L566) | vocabolario di motivi: `sdSegment`, `sdLeaf`, `sdDrop`, `sdRings`, `sdHatch`, `sdCurl` |
+| [611](shader.js#L611) | `bandCell` / `cellBox` / `bandMask` — coordinate locali di una corona |
+| [635](shader.js#L635) | `modeHenna` — modalità 8, mandala a bande piatte |
+| [760](shader.js#L760) | `main()` — pan/zoom/rotazione, dispatch, vignette e tonemap (solo modalità 0–7) |
 
 L'ordine delle funzioni nel file non segue quello delle modalità: il dispatch in
 `main()` è la sola fonte affidabile.

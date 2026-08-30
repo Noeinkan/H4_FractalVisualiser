@@ -1,6 +1,6 @@
 # Fractal Mandala Visualiser
 
-Visualizzatore WebGL di mandala frattali ispirati alla geometria islamica: otto
+Visualizzatore WebGL di mandala ispirati alla geometria islamica: nove
 modalità di rendering, otto palette, simmetria e iterazioni regolabili dal vivo,
 e un permalink nell'URL che descrive per intero la vista che stai guardando.
 
@@ -13,7 +13,7 @@ a un fragment shader GLSL. Niente build step, niente dipendenze, niente backend:
 `index.html` + tre file. Aprirlo da `file://` funziona esattamente come servirlo
 da un web server.
 
-Le otto modalità:
+Le nove modalità:
 
 | # | Modalità | Cosa disegna |
 |---|---|---|
@@ -25,10 +25,16 @@ Le otto modalità:
 | 5 | Cupola Spirale | tassellatura a spirale in stile Sheikh Lotfollah |
 | 6 | Volta a Spicchi | volta a crociera con spicchi ad arco — **incompleta** |
 | 7 | Mihrab | nicchia ad arco acuto con viticci islimi — **incompleta** |
+| 8 | Henna | mandala vettoriale piatto: bande concentriche di motivi disegnati |
 
 Le modalità 6 e 7 sono lasciate accessibili ma non rendono correttamente: su
 tutte le combinazioni di parametri provate collassano in una silhouette piena
 invece di risolvere la struttura. Vedi [roadmap.md](roadmap.md).
+
+La modalità 8 non è un frattale: è illustrazione. Otto bande concentriche,
+ciascuna con la propria simmetria e il proprio motivo, rese a campiture piatte
+con un contorno di spessore costante su fondo chiaro. È l'unica che ignora il
+tonemap e la vignette, e l'unica che va guardata ferma (velocità 0).
 
 ## Come si usa
 
@@ -63,7 +69,7 @@ Ogni modifica riscrive l'hash dell'URL (con debounce a 250 ms) e lo salva in
 
 | Chiave | Significato | Range |
 |---|---|---|
-| `m` | modalità | 0–7 |
+| `m` | modalità | 0–8 |
 | `s` | simmetria (ordine del caleidoscopio) | 3–24 |
 | `p` | petali | 3–16 |
 | `i` | iterazioni | 1–14, con un massimo per modalità |
