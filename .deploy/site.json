@@ -1,0 +1,17 @@
+{
+  "slug": "fractal",
+  "domain": "fractal.77.42.70.26.nip.io",
+  "repo": "git@github-site-fractal:Noeinkan/H4_FractalVisualiser.git",
+  "ref": "main",
+  "type": "static",
+  "buildCommand": null,
+  "outputDir": ".",
+  "spa": false,
+  "port": 8080,
+  "healthPath": "/",
+  "expectStatus": 200,
+  "memLimit": "128m",
+  "maxBody": "4m",
+  "readTimeout": "60s",
+  "notes": "Fractal Mandala Visualiser. Plain HTML/CSS/JS, no build step, no backend, no secrets."
+}

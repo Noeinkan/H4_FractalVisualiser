@@ -1,0 +1,3 @@
+
+# deploy secrets live only on the server
+.deploy/.env
