@@ -24,6 +24,10 @@ html, body {
   inset: 0;
   width: 100vw;
   height: 100vh;
+  /* dvh follows the mobile browser's collapsing toolbar; resize() sizes the
+     drawing buffer from window.innerHeight, so with plain vh the canvas would
+     be stretched by the toolbar's height on a phone. */
+  height: 100dvh;
   display: block;
   cursor: grab;
   /* the canvas handles drag and pinch itself: keep the browser from
@@ -190,4 +194,60 @@ input[type="range"]::-moz-range-thumb {
 
 select {
   width: 100%;
+}
+
+/* ---- Narrow screens ----------------------------------------------------
+   The 260px panel pinned to the top right eats a phone's whole viewport, so
+   below this breakpoint it becomes a bottom sheet: full width, capped height,
+   sliders in two columns. main.js starts it collapsed at the same width — the
+   breakpoint is written in both files, change one and you must change the
+   other. Collapsed it drops `left`, so the ☰ shrinks back to a button in the
+   bottom-right corner, where a thumb can reach it. */
+@media (max-width: 620px) {
+  #panel {
+    top: auto;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: min(68vh, calc(100vh - 24px));
+    border-radius: 16px;
+  }
+  #panel.collapsed { left: auto; }
+
+  /* clear of the collapsed panel's button, which is now bottom-right */
+  #notice { bottom: 76px; }
+  #notice.fatal { bottom: auto; }
+
+  #controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px 12px;
+  }
+  /* The selects hold long option text and the button row needs its width:
+     everything except the sliders spans the pair of columns. */
+  #controls > label.wide,
+  #controls > .row,
+  #controls > .hint { grid-column: 1 / -1; }
+
+  /* Name and readout share a line here. Stacked they cost a third row per
+     slider, which is what pushes the button row off the bottom of the sheet. */
+  #controls > label:not(.wide) {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+    gap: 3px 6px;
+  }
+  #controls > label:not(.wide) input { grid-column: 1 / -1; }
+}
+
+/* ---- Touch ----
+   A 4px track with a 14px thumb is a mouse target. Widen both where the
+   pointer is a finger, whatever the screen width. */
+@media (pointer: coarse) {
+  input[type="range"] { height: 6px; border-radius: 3px; }
+  input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
+  input[type="range"]::-moz-range-thumb     { width: 22px; height: 22px; }
+  button, select { padding: 9px 12px; }
+  #toggle { min-width: 40px; min-height: 40px; }
 }

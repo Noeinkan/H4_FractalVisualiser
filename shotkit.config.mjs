@@ -11,6 +11,12 @@
  * - Every state is reachable from the URL hash; main.js `restore()` reads it on
  *   load. Keys: m=mode s=symmetry p=petals i=iterations z=field-of-view
  *   c=complexity v=speed b=bloom g=palette x/y=pan r=rotation.
+ * - In mode 8 `p` is not a petal count but the plate's seed: it decides band
+ *   widths, cell counts, motifs and fills. Change it and the whole composition
+ *   changes, so a Henna shot is only reproducible with its p pinned. In mode 9
+ *   `p` is a lobe count — the flutes in each niche head, the boss on the
+ *   alternating cells and the crown rosette — so it changes the drawing there
+ *   too, just without moving the geometry of the tiers.
  * - `z` multiplies the uv coordinates: HIGHER z = wider view, LOWER z = deep
  *   zoom. Modes 0, 2 and 3 only show structure below z≈1; modes 1 and 5 want
  *   z≈1.6–2.8.
@@ -22,24 +28,31 @@
  *   With the reload, t ≈ (settleMs/1000 + ~0.3) * v, i.e. ≈6.5 at v=2.
  * - The panel is toggled with `#toggle`; the page is reused across shots, so
  *   each shot must state which panel state it wants rather than assume.
- * - Modes 6 (Volta a Spicchi) and 7 (Mihrab) are deliberately NOT captured.
- *   Across ~20 parameter combinations both render as a flat filled silhouette —
- *   mode 7's niche fills solid gold, mode 6 only fills a couple of its panels.
- *   That looks like a shader bug, not a framing problem; captioning either as
- *   working would oversell it.
+ * - Modes 6 (Volta a Spicchi) and 7 (Mihrab) were rewritten on bounded frames
+ *   and are captured again in shots 11 and 12. Both are still worth probing
+ *   before you re-frame them: mode 6 goes hazy in the inner courses at high
+ *   complexity, mode 7 is the mode whose iteration slider used to flood the
+ *   niche solid gold, so check the top of its range rather than assuming it.
+ * - Mode 7 has an up. Like the two ink modes it ships with speed 0, because
+ *   main() spins the scene with u_time: give it a speed and the niche tips.
  * - No async loading: the first frame is up as soon as the shader links.
  */
 
-const hash = o => '/#' + Object.entries(o).map(([k, v]) => `${k}=${v}`).join('&');
+// Exported by name as well as through the default config: shotkit.readme.mjs
+// builds the versioned README screenshots on top of these, so there stays one
+// definition of what a shot of this app is.
+export const hash = o => '/#' + Object.entries(o).map(([k, v]) => `${k}=${v}`).join('&');
 
-const setPanel = async (page, collapsed) => {
+export const setPanel = async (page, collapsed) => {
   const is = await page.$eval('#panel', el => el.classList.contains('collapsed'));
   if (is !== collapsed) await page.click('#toggle');
   await page.waitForSelector(collapsed ? '#panel.collapsed' : '#panel:not(.collapsed)');
 };
 
 // Reload so u_time restarts at 0 for this shot, then set the panel state.
-const fresh = collapsed => async page => {
+// Below 620px main.js starts the panel collapsed, so `fresh(false)` is what
+// opens it in a narrow viewport — do not assume the load state.
+export const fresh = collapsed => async page => {
   await page.reload({ waitUntil: 'load' });
   await setPanel(page, collapsed);
 };
@@ -143,7 +156,7 @@ export default {
       path: hash({ m: 8, s: 8, p: 6, i: 8, z: 3.2, c: 1, v: 0, b: 0.85, g: 0, x: 0, y: 0, r: 0 }),
       waitFor: '#gl',
       prepare: fresh(true),
-      shows: 'Henna — the flat-ink mandala mode: eight concentric bands, each with its own symmetry count and motif, drawn as flat fills with a constant-width outline instead of the glow used by modes 0-7; Persian Blue',
+      shows: 'Henna — the flat-ink mandala mode: eight concentric bands, each with its own symmetry count and motif, drawn as flat fills with a constant-width outline instead of the glow used by modes 0-7; Persian Blue at seed p=6',
       alt: 'A navy, coral and sage mandala of concentric petal and teardrop rings on off-white paper'
     },
     {
@@ -155,6 +168,61 @@ export default {
       prepare: fresh(true),
       shows: 'the same Henna plate at ten-fold symmetry in Isfahan Gold — showing that in the ink modes the palette swaps flat fills rather than shifting a gradient',
       alt: 'A saffron, red and teal mandala of concentric petal rings on cream paper'
+    },
+    {
+      name: '10-muqarnas',
+      // g=2 (Gold & Cobalt) is the one palette with a dark paper: in an ink
+      // mode that reads as glazed tilework rather than as a drawing, which is
+      // what a muqarnas hood wants.
+      path: hash({ m: 9, s: 6, p: 6, i: 6, z: 2.9, c: 1, v: 0, b: 0.85, g: 2, x: 0, y: 0, r: 0 }),
+      waitFor: '#gl',
+      prepare: fresh(true),
+      shows: 'Muqarnas — the stalactite vault seen from below: six tiers of little pointed-arch niches, the cell count doubling every couple of tiers so the cells stay roughly square as the hood widens; Gold & Cobalt',
+      alt: 'A cobalt and gold vault of concentric tiers of small arched niches seen from directly below'
+    },
+    {
+      name: '11-vault-arcade',
+      // s=16 rather than the mode's own preset of 10: the rim arcade is what
+      // makes this read as a vault, and it needs enough panels to be a rhythm.
+      path: hash({ m: 6, s: 16, p: 6, i: 4, z: 2.7, c: 0.8, v: 0.5, b: 1.2, g: 5, x: 0, y: 0, r: 0 }),
+      waitFor: '#gl',
+      prepare: fresh(true),
+      shows: 'Volta a Spicchi — the ribbed vault from below: sixteen ribs converging on the boss, four courses of lozenges across the webbing, and the arcade of pointed arches where the webbing springs from the wall; Isfahan Gold',
+      alt: 'A vault seen from below, green arches around the rim and blue ribs converging on a dark central boss'
+    },
+    {
+      name: '12-mihrab-lamp',
+      // v=0 like the ink modes: the niche has an up, and main()'s u_time
+      // rotation would tip it. i=5 is deliberately near the top of this mode's
+      // range — the point of the rewrite is that the range is now usable.
+      path: hash({ m: 7, s: 10, p: 5, i: 5, z: 1.7, c: 1, v: 0, b: 0.85, g: 5, x: 0, y: 0, r: 0 }),
+      waitFor: '#gl',
+      prepare: fresh(true),
+      shows: 'Mihrab — the pointed-arch niche: a two-centred arch on a rectangular jamb, the hanging lamp on its chain, and the islimi vine filling the ground at five folds; Isfahan Gold',
+      alt: 'A pointed-arch niche in magenta and gold, filled with a fine vine lattice, a hanging lamp at its centre'
+    },
+    {
+      name: '13-henna-seed',
+      // Same controls as shot 08 apart from p: in mode 8 that slider is the
+      // plate's seed, so this is the fastest way to see how far the composition
+      // moves without touching symmetry, band count or palette.
+      path: hash({ m: 8, s: 8, p: 11, i: 8, z: 3.2, c: 1, v: 0, b: 0.85, g: 0, x: 0, y: 0, r: 0 }),
+      waitFor: '#gl',
+      prepare: fresh(true),
+      shows: 'the Henna seed at work — shot 08 with p changed from 6 to 11 and nothing else: different band widths, different cell counts, different motifs and fills, same symmetry and same palette',
+      alt: 'A navy, coral and sage mandala of concentric rings on off-white paper, differently composed from the earlier one'
+    },
+    {
+      name: '14-muqarnas-lobes',
+      // Shot 10 with p taken from 6 to 12 and nothing else: the tiers, their
+      // cell counts and the tones are unchanged, only the carving inside each
+      // niche and the crown. It is the cheapest way to see the Petali slider
+      // doing something in this mode, which for a while it did not.
+      path: hash({ m: 9, s: 6, p: 12, i: 6, z: 2.9, c: 1, v: 0, b: 0.85, g: 2, x: 0, y: 0, r: 0 }),
+      waitFor: '#gl',
+      prepare: fresh(true),
+      shows: 'the Petali slider in Muqarnas — the same vault as shot 10 at p=12: twelve flutes fanning across each niche head, twelve-pointed bosses on the alternating cells, and a denser crown rosette',
+      alt: 'A cobalt and gold muqarnas vault whose small arched niches are each carved with a fan of fine gold ribs'
     },
     {
       name: '08-randomize',

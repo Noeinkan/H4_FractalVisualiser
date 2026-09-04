@@ -145,7 +145,7 @@
 
   // Highest iteration count each mode actually consumes (its shader loop bound).
   // Beyond these the slider would be inert, so the control's max follows the mode.
-  const MODE_ITER_MAX = { 0: 16, 1: 10, 2: 7, 3: 12, 4: 8, 5: 8, 6: 8, 7: 10, 8: 8 };
+  const MODE_ITER_MAX = { 0: 16, 1: 10, 2: 7, 3: 12, 4: 8, 5: 8, 6: 6, 7: 6, 8: 8, 9: 8 };
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -173,31 +173,93 @@
     3: { symmetry: 6,  iterations: 8,  complexity: 1.00, zoom: 1.4, palette: 6, petals: 6 },
     4: { symmetry: 12, iterations: 5,  complexity: 1.10, zoom: 1.3, palette: 5, petals: 8 },
     5: { symmetry: 14, iterations: 5,  complexity: 1.00, zoom: 1.2, palette: 2, petals: 5 },
-    6: { symmetry:  8, iterations: 6,  complexity: 1.00, zoom: 1.4, palette: 5, petals: 6 },
-    7: { symmetry:  6, iterations: 8,  complexity: 1.05, zoom: 1.3, palette: 5, petals: 5 },
+    6: { symmetry: 10, iterations: 5,  complexity: 1.00, zoom: 2.7, palette: 2, petals: 8 },
+    // The mihrab has an up: the global spin in main() would tip it over, so the
+    // preset parks the clock the way the two ink modes below do.
+    7: { symmetry: 10, iterations: 5,  complexity: 1.00, zoom: 1.7, palette: 5, petals: 5, speed: 0 },
     // Henna is a poster, not an animation: speed 0 so the plate stays put,
-    // and a zoom wide enough to hold all eight bands (outermost r ~ 1.6).
+    // and a zoom wide enough to hold the rings and their finial (r ~ 1.46).
+    // `petals` is the seed of the composition in this mode, not a petal count.
     8: { symmetry:  8, iterations: 8,  complexity: 1.00, zoom: 3.2, palette: 0, petals: 6, speed: 0 },
+    9: { symmetry:  6, iterations: 6,  complexity: 1.00, zoom: 2.9, palette: 2, petals: 6, speed: 0 },
   };
+
+  // Named views for the preset picker. A preset is a permalink and nothing
+  // more: applying one runs through the same deserialize/applyState path the
+  // URL hash uses, so there is only ever one way to install a full state.
+  //
+  // `t` seeds the animation clock. Modes 0, 2, 3 and 4 render a near-flat wash
+  // at t=0 and only resolve after a few seconds of animation, so a preset that
+  // starts them from zero shows the user something that is not what its name
+  // promises. Modes with an up (7, 8, 9) leave `t` out and so start at 0.
+  const NAMED_PRESETS = [
+    { name: "Giardino di smeraldo", t: 6.0,
+      s: "m=1&s=12&p=6&i=7&z=2.8&c=1.1&v=0.6&b=1&g=7&x=-0.12&y=0&r=0" },
+    { name: "Trama caleidoscopica", t: 7.0,
+      s: "m=0&s=12&p=6&i=10&z=0.6&c=0.9&v=0.5&b=1.8&g=2&x=0&y=0&r=0" },
+    // z=0.45 rather than the 0.25 of shot 05: this mode is sparse by nature and
+    // the wider field is the difference between three rings and one.
+    { name: "Stelle girih", t: 5.0,
+      s: "m=2&s=8&p=6&i=7&z=0.45&c=1&v=0.4&b=1&g=5&x=0&y=0&r=0" },
+    { name: "Julia in fiore", t: 6.5,
+      s: "m=3&s=10&p=6&i=9&z=0.5&c=1.05&v=0.5&b=1&g=3&x=0&y=0&r=0" },
+    { name: "Shamsa d'oro", t: 6.0,
+      s: "m=4&s=12&p=8&i=8&z=0.8&c=1.3&v=0.5&b=1&g=5&x=0&y=0&r=0" },
+    { name: "Cupola di Lotfollah", t: 5.0,
+      s: "m=5&s=18&p=5&i=6&z=1.6&c=1.1&v=0.4&b=1&g=1&x=0&y=0&r=0" },
+    // Monochrome Ink has no colour to carry the tiles, so the glow term does:
+    // at b=1 this view is grey on grey.
+    { name: "Inchiostro monocromo", t: 5.0,
+      s: "m=5&s=10&p=5&i=6&z=0.5&c=1.2&v=0.4&b=1.4&g=4&x=0&y=0&r=0" },
+    { name: "Volta a costoloni",
+      s: "m=6&s=16&p=6&i=4&z=2.7&c=0.8&v=0&b=1.2&g=5&x=0&y=0&r=0" },
+    { name: "Mihrab con lampada",
+      s: "m=7&s=10&p=5&i=5&z=1.7&c=1&v=0&b=0.85&g=5&x=0&y=0&r=0" },
+    { name: "Henna blu notte",
+      s: "m=8&s=8&p=6&i=8&z=3.2&c=1&v=0&b=0.85&g=0&x=0&y=0&r=0" },
+    { name: "Henna zafferano",
+      s: "m=8&s=10&p=6&i=8&z=3.2&c=1.2&v=0&b=0.85&g=5&x=0&y=0&r=0" },
+    { name: "Muqarnas cobalto",
+      s: "m=9&s=6&p=6&i=6&z=2.9&c=1&v=0&b=0.85&g=2&x=0&y=0&r=0" },
+  ];
 
   let timeAccum = 0;
   let lastFrame = performance.now();
   let dirty     = true;
   const markDirty = () => { dirty = true; };
 
-  // ---------- Resize ----------
-  function resize(force) {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.floor(window.innerWidth  * dpr);
-    const h = Math.floor(window.innerHeight * dpr);
-    if (force || canvas.width !== w || canvas.height !== h) {
-      canvas.width  = w;
-      canvas.height = h;
-      gl.viewport(0, 0, w, h);
-      markDirty();
-    }
+  // ---------- Resize + adaptive resolution ----------
+  // Every mode is fill-rate bound, so the only lever that buys frames on a slow
+  // GPU is drawing fewer pixels. The drawing buffer shrinks while the scene is
+  // moving (animation, drag, slider) and returns to full resolution as soon as
+  // it settles: motion stays fluid, stills stay sharp. CSS holds the canvas at
+  // viewport size, so the compositor upscales the smaller buffer for free.
+  const DPR_CAP   = 2;
+  const SCALE_MIN = 0.45;
+  const SETTLE_MS = 220;    // input keeps the low-resolution mode alive this long
+
+  let renderScale   = 1;    // learned from frame pacing, applied only while moving
+  let interactUntil = 0;
+  let bufW = 0, bufH = 0;
+
+  const touchInput = () => { interactUntil = performance.now() + SETTLE_MS; };
+
+  function setBuffer(scale) {
+    const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP) * scale;
+    const w = Math.max(1, Math.round(window.innerWidth  * dpr));
+    const h = Math.max(1, Math.round(window.innerHeight * dpr));
+    if (w === bufW && h === bufH) return;
+    canvas.width  = bufW = w;
+    canvas.height = bufH = h;
+    gl.viewport(0, 0, w, h);
+    markDirty();
   }
-  window.addEventListener("resize", resize);
+
+  function resize(force) {
+    if (force === true) bufW = bufH = 0;   // after a context restore the buffer is gone
+    setBuffer(performance.now() < interactUntil ? renderScale : 1);
+  }
+  window.addEventListener("resize", () => resize());
   resize(true);
 
   // ---------- UI bindings ----------
@@ -206,6 +268,7 @@
   let restoring = false;   // suppresses preset application + URL writes while loading state
   let persistTimer = 0;    // declared here: bindRange's initial update() already persists
   let lastHash = "";
+  const presetSel = $("preset");   // read here: schedulePersist runs before the picker is filled
 
   function setControl(id, value) {
     const el = $(id);
@@ -228,7 +291,7 @@
       markDirty();
       schedulePersist();
     };
-    el.addEventListener("input", update);
+    el.addEventListener("input", () => { touchInput(); update(); });
     update();
   };
 
@@ -262,6 +325,10 @@
     if (usePresets) {
       const preset = modePresets[mode];
       if (preset) for (const k in preset) setControl(k, preset[k]);
+      // A preset asking for speed 0 wants a still plate, and the clock keeps
+      // turning the scene through main()'s u_time rotation: rewind it, or the
+      // upright modes arrive tilted by however long the last one ran.
+      if (preset && preset.speed === 0) timeAccum = 0;
       state.pan[0] = 0;
       state.pan[1] = 0;
       state.rot = 0;
@@ -309,10 +376,20 @@
     $("panel").classList.toggle("collapsed");
   });
 
+  // On a narrow screen the open panel is a bottom sheet covering most of the
+  // canvas, so it starts closed and the ☰ button is the way in. The breakpoint
+  // is the one in style.css: change both or neither.
+  if (window.matchMedia("(max-width: 620px)").matches) {
+    $("panel").classList.add("collapsed");
+  }
+
   function saveScreenshot() {
     if (!ready) return;
-    // Draw and snapshot within the same task: without preserveDrawingBuffer the
+    // Full resolution whatever the adaptive scale is doing, then draw and
+    // snapshot within the same task: without preserveDrawingBuffer the
     // backbuffer is only guaranteed valid until the browser composites.
+    interactUntil = 0;
+    setBuffer(1);
     dirty = true;
     render();
     canvas.toBlob(b => {
@@ -355,7 +432,7 @@
   function applyState(o) {
     if (!o || !Object.keys(o).length) return false;
     restoring = true;
-    if ("m" in o) applyMode(clamp(Math.round(o.m), 0, 8), false);
+    if ("m" in o) applyMode(clamp(Math.round(o.m), 0, 9), false);
     for (const key in HASH_MAP) {
       if (key in o) setControl(HASH_MAP[key], o[key]);
     }
@@ -369,6 +446,11 @@
 
   function schedulePersist() {
     if (restoring) return;
+    // Every hand-made change lands here, and any of them means the view is no
+    // longer the named preset still showing in the picker. Installing a preset
+    // does not clear it: that goes through applyState, which holds `restoring`
+    // and returns above.
+    if (presetSel) presetSel.value = "";
     clearTimeout(persistTimer);
     persistTimer = setTimeout(persist, 250);
   }
@@ -405,6 +487,26 @@
     persist();
   })();
 
+  // ---------- Named presets ----------
+  // Filled after restore(), so the picker starts on its placeholder rather than
+  // claiming the restored view is the first preset in the list.
+  if (presetSel) {
+    NAMED_PRESETS.forEach((p, i) => {
+      const opt = document.createElement("option");
+      opt.value = String(i);
+      opt.textContent = p.name;
+      presetSel.appendChild(opt);
+    });
+    presetSel.addEventListener("change", e => {
+      const p = NAMED_PRESETS[parseInt(e.target.value, 10)];
+      if (!p) return;
+      applyState(deserialize(p.s));
+      timeAccum = p.t || 0;
+      markDirty();
+      persist();
+    });
+  }
+
   // ---------- Interaction: drag, pinch, wheel, dblclick ----------
   // Screen mapping mirrors the shader: uv = (frag - 0.5*res)/min(res) - pan,
   // so pan is expressed in screen units and moves the image 1:1 with the
@@ -427,11 +529,13 @@
     const m = minSide();
     state.pan[0] += dxClient / m;
     state.pan[1] -= dyClient / m;
+    touchInput();
     markDirty();
   }
 
   // Zoom anchored on a screen point: keeps the scene under (clientX, clientY) fixed.
   function zoomAt(clientX, clientY, factor) {
+    touchInput();
     const z0 = state.zoom;
     setControl("zoom", clamp(z0 * factor, ZOOM_MIN, ZOOM_MAX).toFixed(2));
     const z1 = state.zoom;             // value after the slider's own step snapping
@@ -482,6 +586,7 @@
 
     if (e.shiftKey) {
       state.rot += dx * 0.005;
+      touchInput();
       markDirty();
     } else {
       panBy(dx, dy);
@@ -511,7 +616,7 @@
 
   // ---------- Render loop ----------
   function render() {
-    if (!ready || !dirty) return;
+    if (!ready || !dirty) return false;
     gl.uniform2f(U.resolution, canvas.width, canvas.height);
     gl.uniform1f(U.time,       timeAccum);
     gl.uniform1f(U.symmetry,   state.symmetry);
@@ -526,16 +631,56 @@
     gl.uniform1f(U.rot,        state.rot);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     dirty = false;
+    return true;
+  }
+
+  // rAF deltas are the only honest measure of cost here: drawArrays returns long
+  // before the GPU is done, so the wall time until the next frame is what says
+  // whether the last one fit the budget. Frames that drew nothing say nothing.
+  //
+  // The thresholds are relative to the display, not absolute: under vsync a
+  // healthy frame lands *exactly* on the refresh interval, so no fixed "fast"
+  // number could ever be met on a 60 Hz panel and the scale would only ever go
+  // down. The budget is the shortest interval seen, floored at 11 ms so a
+  // 144 Hz panel doesn't drag the resolution down chasing 144 fps.
+  let emaDt = 16.7, vsyncMs = 16.7, drewLast = false, scaleHold = 0;
+
+  function adapt(now, dtMs) {
+    if (dtMs > 4 && dtMs < vsyncMs) vsyncMs += (dtMs - vsyncMs) * 0.5;
+    const budget = Math.max(vsyncMs, 11);
+    emaDt += (dtMs - emaDt) * 0.12;
+    if (now < scaleHold) return;
+    if (emaDt > budget * 1.45 && renderScale > SCALE_MIN) {
+      renderScale = Math.max(SCALE_MIN, renderScale - 0.15);
+      scaleHold = now + 500;
+    } else if (emaDt < budget * 1.12 && renderScale < 1) {
+      // Slower on the way up: overshooting costs a visible stutter, and a still
+      // frame is drawn at full resolution anyway.
+      renderScale = Math.min(1, renderScale + 0.1);
+      scaleHold = now + 900;
+    }
   }
 
   function frame(now) {
-    const dt = (now - lastFrame) * 0.001;
+    const dtMs = Math.min(now - lastFrame, 100);   // a backgrounded tab must not jump the clock
     lastFrame = now;
-    if (!state.paused) {
-      timeAccum += dt * state.speed;
+
+    // speed 0 is a still image, not a slow animation: without this the loop
+    // would redraw an identical frame 60 times a second (modes 7-9 live there).
+    const animating = !state.paused && state.speed !== 0;
+    if (animating) {
+      timeAccum += dtMs * 0.001 * state.speed;
       dirty = true;
     }
-    render();
+
+    const moving = animating || now < interactUntil;
+    // Going idle resets the average to "healthy": the frames spent doing
+    // nothing must not count as either cheap or expensive when motion resumes.
+    if (moving && drewLast) adapt(now, dtMs);
+    else if (!moving) emaDt = Math.max(vsyncMs, 11);
+
+    setBuffer(moving ? renderScale : 1);
+    drewLast = render();
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

@@ -12,9 +12,12 @@ H4_FractalVisualiser/
 ├── style.css             tema scuro, pannello, slider, notice
 ├── shader.js             sorgenti GLSL — window.FRACTAL_SHADER
 ├── main.js               contesto GL, stato, UI, permalink, input, render loop
-├── shotkit.config.mjs    config screenshot-kit (non usata a runtime)
+├── shotkit.config.mjs    config screenshot-kit, suite di lavoro (non usata a runtime)
+├── shotkit.readme.mjs    config screenshot-kit, le immagini del README
+├── screenshots/          le sei immagini del README — versionate
 ├── .deploy/              deploy statico dietro nginx condiviso
 ├── .shots/               screenshot generati (gitignored)
+├── LICENSE               MIT
 ├── README.md             panoramica per chi usa il progetto
 ├── CLAUDE.md             note per gli agenti
 └── roadmap.md            piano, nel formato letto da repo-radar
@@ -27,12 +30,15 @@ Nessuno script inline. Carica `shader.js` prima di `main.js` — l'ordine conta:
 fatale se non lo trova.
 
 Elementi con id, tutti letti da `main.js`: `gl` (canvas), `notice`, `panel`,
-`toggle`, `controls`, `mode`, `symmetry`, `petals`, `zoom`, `iterations`,
-`complexity`, `speed`, `palette`, `bloom`, `pause`, `randomize`, `screenshot`,
-`reset`. Ogni slider ha un `<span data-out="<id>">` accoppiato che ne mostra il
-valore.
+`toggle`, `controls`, `preset`, `mode`, `symmetry`, `petals`, `zoom`,
+`iterations`, `complexity`, `speed`, `palette`, `bloom`, `pause`, `randomize`,
+`screenshot`, `reset`. Ogni slider ha un `<span data-out="<id>">` accoppiato che
+ne mostra il valore. `#preset` ha in markup solo il segnaposto: le voci le
+aggiunge `main.js` da `NAMED_PRESETS`. La classe `wide` sui tre `<label>` che
+contengono un `<select>` è ciò che, su schermo stretto, li fa occupare entrambe
+le colonne della griglia.
 
-## [shader.js](shader.js) — 572 righe
+## [shader.js](shader.js) — 1074 righe
 
 IIFE che espone `window.FRACTAL_SHADER = { VERT, FRAG_BODY }`. `FRAG_BODY`
 **non** contiene la riga `#extension`: la antepone `buildGL()`.
@@ -45,25 +51,32 @@ IIFE che espone `window.FRACTAL_SHADER = { VERT, FRAG_BODY }`. `FRAG_BODY`
 | [52](shader.js#L52) | `sdRose(p, k)` — SDF di una rosa a k petali |
 | [60](shader.js#L60) | `sdPolygon(p, n, R)` — SDF poligono regolare |
 | [68](shader.js#L68) | `sdStar(p, n, R)` — intersezione di due poligoni ruotati |
-| [75](shader.js#L75) | `pal()` + `pickPalette()` — le otto palette |
-| [110](shader.js#L110) | `modeKaleido` — modalità 0, IFS + inversione |
-| [142](shader.js#L142) | `modeFloral` — modalità 1, arabesco islimi |
-| [201](shader.js#L201) | `modeGirih` — modalità 2, tassellatura stellare |
-| [261](shader.js#L261) | `modeJulia` — modalità 3, insieme di Julia |
-| [293](shader.js#L293) | `modeVault` — modalità 6, **incompleta** |
-| [360](shader.js#L360) | `modeMihrab` — modalità 7, **incompleta** |
-| [433](shader.js#L433) | `modeDome` — modalità 5, spirale a cupola |
-| [499](shader.js#L499) | `modeShamsa` — modalità 4, medaglione |
-| [536](shader.js#L536) | toolkit inchiostro piatto: `Ink`, `inkPalette`, `over`, `fillMask`, `lineMask` |
-| [566](shader.js#L566) | vocabolario di motivi: `sdSegment`, `sdLeaf`, `sdDrop`, `sdRings`, `sdHatch`, `sdCurl` |
-| [611](shader.js#L611) | `bandCell` / `cellBox` / `bandMask` — coordinate locali di una corona |
-| [635](shader.js#L635) | `modeHenna` — modalità 8, mandala a bande piatte |
-| [760](shader.js#L760) | `main()` — pan/zoom/rotazione, dispatch, vignette e tonemap (solo modalità 0–7) |
+| [79](shader.js#L79) | `fillMask` / `lineMask` — copertura antialiasata da una distanza |
+| [82](shader.js#L82) | `sdSegment(p, a, b)` — SDF di un segmento |
+| [92](shader.js#L92) | `sdArch(p, w, h)` — arco a due centri, acuto o a tutto sesto |
+| [108](shader.js#L108) | `bandCell` / `cellBox` / `bandMask` — coordinate locali di una corona |
+| [126](shader.js#L126) | `pal()` + `pickPalette()` — le otto palette |
+| [161](shader.js#L161) | `modeKaleido` — modalità 0, IFS + inversione |
+| [193](shader.js#L193) | `modeFloral` — modalità 1, arabesco islimi |
+| [252](shader.js#L252) | `modeGirih` — modalità 2, tassellatura stellare |
+| [312](shader.js#L312) | `modeJulia` — modalità 3, insieme di Julia |
+| [351](shader.js#L351) | `modeVault` — modalità 6, volta costolonata con arcata sul bordo |
+| [445](shader.js#L445) | `modeMihrab` — modalità 7, nicchia con lampada e viticci |
+| [540](shader.js#L540) | `modeDome` — modalità 5, spirale a cupola |
+| [606](shader.js#L606) | `modeShamsa` — modalità 4, medaglione |
+| [643](shader.js#L643) | toolkit inchiostro piatto: `Ink`, `inkPalette`, `over` |
+| [672](shader.js#L672) | vocabolario di motivi: `sdLeaf`, `sdDrop`, `sdRings`, `sdHatch`, `sdCurl` |
+| [715](shader.js#L715) | `hRand` / `inkSlot` — hash del seme e scelta di una campitura |
+| [732](shader.js#L732) | `Cell` + `hennaMotif` — gli otto motivi che una banda può ospitare |
+| [812](shader.js#L812) | `hennaBand` — una corona: fondo, motivo in ogni cella, filetto |
+| [839](shader.js#L839) | `modeHenna` — modalità 8, mandala a bande piatte generate dal seme |
+| [943](shader.js#L943) | `modeMuqarnas` — modalità 9, volta a stalattiti |
+| [1031](shader.js#L1031) | `main()` — pan/zoom/rotazione, dispatch, vignette e tonemap (solo modalità 0–7) |
 
 L'ordine delle funzioni nel file non segue quello delle modalità: il dispatch in
 `main()` è la sola fonte affidabile.
 
-## [main.js](main.js) — 539 righe
+## [main.js](main.js) — 677 righe
 
 IIFE in `"use strict"`. Sezioni, nell'ordine in cui compaiono:
 
@@ -72,33 +85,47 @@ IIFE in `"use strict"`. Sezioni, nell'ordine in cui compaiono:
 | [4](main.js#L4) | Notices | `showNotice` / `hideNotice`, errori fatali con escaping |
 | [29](main.js#L29) | Contesto GL | `GL_OPTS`, `getContext`, uscita se WebGL manca |
 | [47](main.js#L47) | Programma GL | `compile()`, `buildGL()`, header `FW()`, uniform in `U` |
-| [125](main.js#L125) | Context loss | listener `webglcontextlost` / `restored` |
+| [129](main.js#L129) | Context loss | listener `webglcontextlost` / `restored` |
 | [142](main.js#L142) | Costanti | `ZOOM_MIN/MAX`, `MODE_ITER_MAX`, `clamp` |
 | [152](main.js#L152) | Stato | oggetto `state`, `modePresets` per modalità |
-| [185](main.js#L185) | Resize | DPR limitato a 2, viewport |
-| [200](main.js#L200) | UI | `$`, `setControl`, `bindRange`, `applyMode`, i bottoni |
-| [309](main.js#L309) | Screenshot | `saveScreenshot` — disegna e cattura nello stesso task |
-| [326](main.js#L326) | Permalink | `serialize`/`deserialize`/`applyState`/`persist`, `HASH_MAP`, restore |
-| [405](main.js#L405) | Interazione | `clientToUV`, `panBy`, `zoomAt`, pointer, pinch, wheel |
-| [509](main.js#L509) | Render loop | `render()` on-demand + `frame()` con `requestAnimationFrame` |
+| [195](main.js#L195) | `NAMED_PRESETS` | le viste nominate del menu: permalink + `t` iniziale |
+| [231](main.js#L231) | Resize + risoluzione adattiva | `setBuffer()`, `renderScale`, `touchInput()` |
+| [265](main.js#L265) | UI | `$`, `setControl`, `bindRange`, `applyMode`, i bottoni |
+| [389](main.js#L389) | Screenshot | `saveScreenshot` — piena risoluzione, cattura nello stesso task |
+| [406](main.js#L406) | Permalink | `serialize`/`deserialize`/`applyState`/`persist`, `HASH_MAP`, restore |
+| [490](main.js#L490) | Menu dei preset | riempie `#preset` e installa la vista scelta |
+| [510](main.js#L510) | Interazione | `clientToUV`, `panBy`, `zoomAt`, pointer, pinch, wheel |
+| [617](main.js#L617) | Render loop | `render()` on-demand, `adapt()` e `frame()` |
 
 Concetti chiave: `dirty`/`markDirty()` (si disegna solo quando serve),
+`renderScale` (il buffer si restringe mentre la scena si muove),
 `restoring` (sopprime preset e scritture URL durante un restore),
-`schedulePersist()` (debounce 250 ms su hash + `localStorage`).
+`schedulePersist()` (debounce 250 ms su hash + `localStorage`, ed è anche il
+punto in cui il menu dei preset torna al segnaposto).
 
-## [style.css](style.css) — 193 righe
+## [style.css](style.css) — 253 righe
 
 Variabili di tema in `:root` ([1](style.css#L1)). Blocchi: `#gl`
-([22](style.css#L22)), `#notice` e la variante `.fatal` ([35](style.css#L35)),
-`#panel` con lo stato `.collapsed` ([70](style.css#L70)), controlli e slider
-([107](style.css#L107)), `.row` dei bottoni ([171](style.css#L171)).
+([22](style.css#L22)), `#notice` e la variante `.fatal` ([39](style.css#L39)),
+`#panel` con lo stato `.collapsed` ([74](style.css#L74)), controlli e slider
+([111](style.css#L111)), `.row` dei bottoni ([175](style.css#L175)), il pannello
+a foglio sotto i 620 px ([206](style.css#L206)) e i bersagli più grandi con
+puntatore grosso ([247](style.css#L247)).
 
 ## [shotkit.config.mjs](shotkit.config.mjs)
 
 Config per screenshot-kit: non viene caricata dall'app. Il commento in testa
 raccoglie quello che è costato tempo alla prima esecuzione — server statico,
-`gpu: true` obbligatorio, il reload necessario fra uno shot e l'altro, e perché
-le modalità 6 e 7 non sono catturate.
+`gpu: true` obbligatorio, il reload necessario fra uno shot e l'altro, e cosa
+guardare nelle modalità 6 e 7. Oltre al `default` esporta `hash`, `setPanel` e
+`fresh`, che sono ciò su cui è costruita la seconda config.
+
+## [shotkit.readme.mjs](shotkit.readme.mjs)
+
+Le sei immagini che il README mostra, in `screenshots/`, versionate. Non
+ridefinisce le inquadrature: prende quelle di `shotkit.config.mjs` e le rinomina,
+abbassando la risoluzione a 1200×750 a scala 1. L'unico scatto suo è
+`panel-narrow`, il pannello a foglio su una finestra larga 390 px.
 
 ## [.deploy/](.deploy/)
 

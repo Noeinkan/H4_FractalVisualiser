@@ -6,6 +6,9 @@ piano già concordato: scadenze e priorità vanno confermate.
 ## Milestone: Base giocabile
 
 - [x] Otto modalità GLSL con dispatch da uniform <!-- size: XL; done: 2026-08-30 -->
+- [x] Modalità 8 (Henna): mandala vettoriale piatto a bande concentriche <!-- size: L; done: 2026-08-31 -->
+- [x] Modalità 8: composizione delle corone generata dal seme «petali» invece che fissa <!-- size: L; done: 2026-09-04 -->
+- [x] Modalità 9 (Muqarnas): volta a stalattiti vista dal basso <!-- size: L; done: 2026-08-31 -->
 - [x] Pannello controlli: simmetria, petali, zoom, iterazioni, complessità, velocità, palette, bloom <!-- size: M; done: 2026-08-30 -->
 - [x] Pan, rotazione con Shift, zoom ancorato al puntatore, pinch <!-- size: M; done: 2026-08-30 -->
 - [x] Permalink nell'hash e ripristino da localStorage <!-- size: M; done: 2026-08-30 -->
@@ -17,20 +20,34 @@ piano già concordato: scadenze e priorità vanno confermate.
 
 ## Milestone: Le due modalità rotte
 
-Modalità 6 (Volta a Spicchi) e 7 (Mihrab) collassano in una silhouette piena su
-tutte le combinazioni di parametri provate. Sono nel menu ma non mostrabili.
+Chiusa. Entrambe le cause erano di parametrizzazione, non di stimatore. La 7
+saturava perché il ciclo IFS ripiegava la curva sotto il pixel molto prima del
+massimo dichiarato: ora ogni livello si dissolve quando il suo passo scende
+sotto la dimensione del pixel, e il tetto è sceso da 10 a 6. La 6 è stata
+riscritta sul frame di cella di `bandCell`/`cellBox` — costoloni, corsi di
+losanghe a spaziatura geometrica e un'arcata di archi acuti sul bordo — al posto
+dello spazio `(la*r, r)` non limitato che la faceva rendere come una ruota di
+spicchi.
 
-- [ ] Diagnosi di modeMihrab: capire quale termine satura la nicchia <!-- size: M -->
-- [ ] Diagnosi di modeVault: capire perché solo alcuni spicchi si riempiono <!-- size: M -->
-- [ ] Correggere le due modalità o rimuoverle dal menu <!-- size: L -->
-- [ ] Aggiungere i due shot mancanti a shotkit.config.mjs <!-- size: S -->
+- [x] Diagnosi di modeMihrab: satura per eccesso di iterazioni, non per il termine <!-- size: M; done: 2026-08-31 -->
+- [x] Diagnosi di modeVault: regione dell'arco non limitata, motivo sfasato per sid <!-- size: M; done: 2026-08-31 -->
+- [x] Abbassare il tetto di iterazioni della 7 e ritarare l'arco a due centri <!-- size: M; done: 2026-09-04 -->
+- [x] Riscrivere modeVault su una parametrizzazione limitata <!-- size: L; done: 2026-09-04 -->
+- [x] Aggiungere i due shot mancanti a shotkit.config.mjs <!-- size: S; done: 2026-09-04 -->
 
 ## Milestone: Presentabilità
 
-- [ ] Scegliere e aggiungere una licenza <!-- size: S -->
-- [ ] Screenshot versionati per il README, fuori da .shots/ <!-- size: S -->
-- [ ] Preset nominati selezionabili dal pannello <!-- size: M -->
-- [ ] Pannello usabile su schermo stretto <!-- size: M -->
+Chiusa. La licenza è MIT, scelta dall'autore. Le sei immagini del README vivono
+in `screenshots/` e sono versionate: le produce `shotkit.readme.mjs`, che importa
+le inquadrature da `shotkit.config.mjs` invece di riscriverle. Il menu dei preset
+è dodici permalink e riusa `deserialize` + `applyState`, con un tempo iniziale
+per le modalità che a `t=0` non hanno ancora risolto. Sotto i 620 px il pannello
+diventa un foglio in basso con gli slider su due colonne e parte chiuso.
+
+- [x] Scegliere e aggiungere una licenza <!-- size: S; done: 2026-09-04 -->
+- [x] Screenshot versionati per il README, fuori da .shots/ <!-- size: S; done: 2026-09-04 -->
+- [x] Preset nominati selezionabili dal pannello <!-- size: M; done: 2026-09-04 -->
+- [x] Pannello usabile su schermo stretto <!-- size: M; done: 2026-09-04 -->
 
 ## Milestone: Qualità del rendering
 
@@ -44,4 +61,5 @@ tutte le combinazioni di parametri provate. Sono nel menu ma non mostrabili.
 - [ ] Registrazione di un loop animato (WebM o sequenza PNG) <!-- size: XL -->
 - [ ] Interfaccia in inglese accanto all'italiano <!-- size: M -->
 - [ ] Nuove palette a partire da riferimenti fotografici <!-- size: M -->
-- [ ] Modalità aggiuntive: muqarnas, tassellature aperiodiche <!-- size: XL -->
+- [ ] Modalità aggiuntive: tassellature aperiodiche, chahar bagh in pianta <!-- size: XL -->
+- [ ] Famiglia completa di archi (ferro di cavallo, carena) sopra `sdArch` <!-- size: M -->

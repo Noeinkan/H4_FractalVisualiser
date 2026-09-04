@@ -4,3 +4,11 @@
 
 # screenshot-kit output
 .shots/
+.shots-probe/
+
+# screenshots/ holds the versioned README images, but a run also drops its own
+# bookkeeping in there: that part is not versioned.
+screenshots/manifest.json
+screenshots/server.log
+screenshots/_contact.html
+screenshots/contact-sheet.png

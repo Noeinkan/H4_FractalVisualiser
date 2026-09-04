@@ -18,7 +18,15 @@
   </header>
 
   <div id="controls">
-    <label>Modalità
+    <label class="wide">Preset
+      <!-- The named views are filled in by main.js: they are permalinks, and
+           keeping them next to the state code stops the two from drifting. -->
+      <select id="preset">
+        <option value="">— scegli una vista —</option>
+      </select>
+    </label>
+
+    <label class="wide">Modalità
       <select id="mode">
         <option value="0">Kaleido IFS</option>
         <option value="1" selected>Giardino Floreale (islimi)</option>
@@ -29,6 +37,7 @@
         <option value="6">Volta a Spicchi</option>
         <option value="7">Mihrab (nicchia)</option>
         <option value="8">Henna (mandala piatto)</option>
+        <option value="9">Muqarnas (volta a stalattiti)</option>
       </select>
     </label>
 
@@ -56,7 +65,7 @@
       <input type="range" id="speed" min="0" max="2" step="0.01" value="0.35" />
     </label>
 
-    <label>Palette
+    <label class="wide">Palette
       <select id="palette">
         <option value="0">Persian Blue</option>
         <option value="1">Azulejo</option>
