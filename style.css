@@ -137,11 +137,25 @@ label {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-label span {
+/* Only the readout is the accent-coloured monospace half of a label: the name
+   half is rewritten per mode and stays in the panel's own type. */
+label span[data-out] {
   color: var(--accent);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11px;
 }
+
+/* A mode that never reads a uniform gets its slider dimmed and disabled rather
+   than removed: the panel keeps the same shape (nothing jumps when the mode
+   changes) and the value keeps living in the permalink — it just stops
+   pretending the knob does something. */
+label.inert { opacity: 0.4; }
+label.inert input[type="range"] {
+  filter: grayscale(1);
+  cursor: not-allowed;
+}
+label.inert input[type="range"]::-webkit-slider-thumb { background: #7f8aa0; box-shadow: none; }
+label.inert input[type="range"]::-moz-range-thumb     { background: #7f8aa0; }
 
 input[type="range"] {
   -webkit-appearance: none;

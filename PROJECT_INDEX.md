@@ -32,8 +32,9 @@ fatale se non lo trova.
 Elementi con id, tutti letti da `main.js`: `gl` (canvas), `notice`, `panel`,
 `toggle`, `controls`, `preset`, `mode`, `symmetry`, `petals`, `zoom`,
 `iterations`, `complexity`, `speed`, `palette`, `bloom`, `pause`, `randomize`,
-`screenshot`, `reset`. Ogni slider ha un `<span data-out="<id>">` accoppiato che
-ne mostra il valore. `#preset` ha in markup solo il segnaposto: le voci le
+`screenshot`, `reset`. Ogni slider ha due span: `<span class="name">` con il
+nome, che `syncPanel()` riscrive secondo la modalità, e `<span data-out="<id>">`
+con il valore. `#preset` ha in markup solo il segnaposto: le voci le
 aggiunge `main.js` da `NAMED_PRESETS`. La classe `wide` sui tre `<label>` che
 contengono un `<select>` è ciò che, su schermo stretto, li fa occupare entrambe
 le colonne della griglia.
@@ -76,7 +77,7 @@ IIFE che espone `window.FRACTAL_SHADER = { VERT, FRAG_BODY }`. `FRAG_BODY`
 L'ordine delle funzioni nel file non segue quello delle modalità: il dispatch in
 `main()` è la sola fonte affidabile.
 
-## [main.js](main.js) — 677 righe
+## [main.js](main.js) — 768 righe
 
 IIFE in `"use strict"`. Sezioni, nell'ordine in cui compaiono:
 
@@ -86,16 +87,17 @@ IIFE in `"use strict"`. Sezioni, nell'ordine in cui compaiono:
 | [29](main.js#L29) | Contesto GL | `GL_OPTS`, `getContext`, uscita se WebGL manca |
 | [47](main.js#L47) | Programma GL | `compile()`, `buildGL()`, header `FW()`, uniform in `U` |
 | [129](main.js#L129) | Context loss | listener `webglcontextlost` / `restored` |
-| [142](main.js#L142) | Costanti | `ZOOM_MIN/MAX`, `MODE_ITER_MAX`, `clamp` |
-| [152](main.js#L152) | Stato | oggetto `state`, `modePresets` per modalità |
-| [195](main.js#L195) | `NAMED_PRESETS` | le viste nominate del menu: permalink + `t` iniziale |
-| [231](main.js#L231) | Resize + risoluzione adattiva | `setBuffer()`, `renderScale`, `touchInput()` |
-| [265](main.js#L265) | UI | `$`, `setControl`, `bindRange`, `applyMode`, i bottoni |
-| [389](main.js#L389) | Screenshot | `saveScreenshot` — piena risoluzione, cattura nello stesso task |
-| [406](main.js#L406) | Permalink | `serialize`/`deserialize`/`applyState`/`persist`, `HASH_MAP`, restore |
-| [490](main.js#L490) | Menu dei preset | riempie `#preset` e installa la vista scelta |
-| [510](main.js#L510) | Interazione | `clientToUV`, `panBy`, `zoomAt`, pointer, pinch, wheel |
-| [617](main.js#L617) | Render loop | `render()` on-demand, `adapt()` e `frame()` |
+| [142](main.js#L142) | Costanti | `ZOOM_MIN/MAX`, `MODE_ITER_MAX`, `MODE_UI`, `clamp` |
+| [187](main.js#L187) | Stato | oggetto `state`, `modePresets` per modalità |
+| [230](main.js#L230) | `NAMED_PRESETS` | le viste nominate del menu: permalink + `t` iniziale |
+| [266](main.js#L266) | Resize + risoluzione adattiva | `setBuffer()`, `renderScale`, `touchInput()` |
+| [300](main.js#L300) | UI | `$`, `setControl`, `bindRange`, i bottoni, Random per modalità |
+| [347](main.js#L347) | Pannello adattivo | `sliders`, `syncPanel()`, `applyMode()` |
+| [467](main.js#L467) | Screenshot | `saveScreenshot` — piena risoluzione, cattura nello stesso task |
+| [487](main.js#L487) | Permalink | `serialize`/`deserialize`/`applyState`/`persist`, `HASH_MAP`, restore |
+| [571](main.js#L571) | Menu dei preset | riempie `#preset` e installa la vista scelta |
+| [591](main.js#L591) | Interazione | `clientToUV`, `panBy`, `zoomAt`, pointer, pinch, wheel |
+| [698](main.js#L698) | Render loop | `render()` on-demand, `adapt()` e `frame()` |
 
 Concetti chiave: `dirty`/`markDirty()` (si disegna solo quando serve),
 `renderScale` (il buffer si restringe mentre la scena si muove),
@@ -103,14 +105,15 @@ Concetti chiave: `dirty`/`markDirty()` (si disegna solo quando serve),
 `schedulePersist()` (debounce 250 ms su hash + `localStorage`, ed è anche il
 punto in cui il menu dei preset torna al segnaposto).
 
-## [style.css](style.css) — 253 righe
+## [style.css](style.css) — 267 righe
 
 Variabili di tema in `:root` ([1](style.css#L1)). Blocchi: `#gl`
 ([22](style.css#L22)), `#notice` e la variante `.fatal` ([39](style.css#L39)),
 `#panel` con lo stato `.collapsed` ([74](style.css#L74)), controlli e slider
-([111](style.css#L111)), `.row` dei bottoni ([175](style.css#L175)), il pannello
-a foglio sotto i 620 px ([206](style.css#L206)) e i bersagli più grandi con
-puntatore grosso ([247](style.css#L247)).
+([111](style.css#L111)), `label.inert` — lo slider spento dalla modalità
+([152](style.css#L152)) —, `.row` dei bottoni ([189](style.css#L189)), il
+pannello a foglio sotto i 620 px ([220](style.css#L220)) e i bersagli più grandi
+con puntatore grosso ([261](style.css#L261)).
 
 ## [shotkit.config.mjs](shotkit.config.mjs)
 

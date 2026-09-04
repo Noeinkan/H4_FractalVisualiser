@@ -41,27 +41,30 @@
       </select>
     </label>
 
-    <label>Simmetria <span data-out="symmetry">8</span>
+    <!-- The name of every slider lives in its own <span class="name">: the mode
+         rewrites it (see MODE_UI in main.js), so it cannot be a bare text node
+         next to the readout. -->
+    <label><span class="name">Simmetria</span> <span data-out="symmetry">8</span>
       <input type="range" id="symmetry" min="3" max="24" step="1" value="8" />
     </label>
 
-    <label>Petali <span data-out="petals">6</span>
+    <label><span class="name">Petali</span> <span data-out="petals">6</span>
       <input type="range" id="petals" min="3" max="16" step="1" value="6" />
     </label>
 
-    <label>Campo visivo <span data-out="zoom">1.6</span>
+    <label><span class="name">Campo visivo</span> <span data-out="zoom">1.6</span>
       <input type="range" id="zoom" min="0.2" max="8" step="0.01" value="1.6" />
     </label>
 
-    <label>Iterazioni <span data-out="iterations">7</span>
+    <label><span class="name">Iterazioni</span> <span data-out="iterations">7</span>
       <input type="range" id="iterations" min="1" max="14" step="1" value="7" />
     </label>
 
-    <label>Complessità <span data-out="complexity">1.10</span>
+    <label><span class="name">Complessità</span> <span data-out="complexity">1.10</span>
       <input type="range" id="complexity" min="0.50" max="1.80" step="0.01" value="1.10" />
     </label>
 
-    <label>Velocità <span data-out="speed">0.35</span>
+    <label><span class="name">Velocità</span> <span data-out="speed">0.35</span>
       <input type="range" id="speed" min="0" max="2" step="0.01" value="0.35" />
     </label>
 
@@ -78,7 +81,7 @@
       </select>
     </label>
 
-    <label>Bloom <span data-out="bloom">0.85</span>
+    <label><span class="name">Bloom</span> <span data-out="bloom">0.85</span>
       <input type="range" id="bloom" min="0" max="2" step="0.01" value="0.85" />
     </label>
 

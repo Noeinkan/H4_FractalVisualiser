@@ -72,7 +72,7 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   per le modalità 8 e 9). Un preset nuovo che dipende dall'orientamento deve
   fare lo stesso.
 - **Un preset nominato è un permalink, non un secondo tipo di stato.**
-  `NAMED_PRESETS` in [main.js](main.js#L195) tiene stringhe nello stesso formato
+  `NAMED_PRESETS` in [main.js](main.js#L230) tiene stringhe nello stesso formato
   che `serialize()` scrive, e sceglierne una passa per `deserialize` +
   `applyState`, cioè per la stessa strada dell'hash. Non aggiungere un percorso
   parallelo che scriva su `state`: si perderebbero il ri-clamp delle iterazioni
@@ -87,11 +87,22 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   condividerne una sola: se la sposti, spostala in entrambi.
 - **`preserveDrawingBuffer` è disattivato di proposito** (costa a ogni frame).
   L'export PNG disegna e cattura nello stesso task: se tocchi `saveScreenshot`
-  in [main.js](main.js#L367), quell'invariante va mantenuta.
+  in [main.js](main.js#L467), quell'invariante va mantenuta.
 - **`MODE_ITER_MAX`** in [main.js](main.js#L148) deve restare allineato ai bound
   dei loop nello shader. Se cambi il `for (int i = 0; i < N; i++)` di una
   modalità, aggiorna anche la voce corrispondente, altrimenti lo slider ha una
   coda inerte.
+- **`MODE_UI`** in [main.js](main.js#L166) dice cosa ogni modalità fa degli
+  slider, e `syncPanel()` lo applica: `inert` spegne e sbiadisce un controllo
+  che lo shader non legge, `names` gli dà il nome che quella modalità gli dà
+  davvero (in modalità 8 «Petali» è il seme del piatto), `upright` marca le
+  modalità con un alto perché il Random non le metta a girare. È solo etichetta:
+  `state`, l'hash e i preset non lo vedono, e uno slider inerte conserva il suo
+  valore — `setControl` raggiunge anche un input `disabled`, quindi un permalink
+  scritto sotto un'altra modalità si ripristina intero. Regola: se una modalità
+  nuova ignora un uniform, mettilo in `inert` invece di lasciare la manopola a
+  fingere; se lo legge come altro, dagli il nome in `names`. `bloom` non va mai
+  in `inert`: nelle modalità 0–7 passa comunque dal tonemap di `main()`.
 - **Il flag `restoring`** sopprime l'applicazione dei preset e la riscrittura
   dell'URL mentre si carica uno stato. Ogni nuovo percorso che chiama
   `setControl` o `applyMode` durante un restore deve rispettarlo.
@@ -137,7 +148,7 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   aggiungi qualcosa fuori, tienilo entro il finale di bordo (r ≈ 1.46), che è
   ciò che il campo visivo 3.2 del preset inquadra.
 - **La risoluzione cala mentre la scena si muove.** `setBuffer()` in
-  [main.js](main.js#L231) ridimensiona il drawing buffer: `renderScale` scende
+  [main.js](main.js#L266) ridimensiona il drawing buffer: `renderScale` scende
   fino a 0.45 quando le frame superano i 24 ms e risale quando ne bastano 13, ma
   solo durante l'animazione, un drag o uno slider. Passati 220 ms dall'ultimo
   input il buffer torna a piena risoluzione e disegna una frame nitida. Quindi
@@ -173,7 +184,9 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
    altre, con lo stesso commento di intestazione a banda.
 2. Aggiungi il ramo in `main()` (catena `u_mode < N.5`).
 3. Aggiungi l'`<option>` in [index.html](index.html) con il valore numerico.
-4. Aggiungi la voce in `MODE_ITER_MAX` e in `modePresets` in [main.js](main.js).
+4. Aggiungi la voce in `MODE_ITER_MAX`, in `modePresets` e in `MODE_UI` in
+   [main.js](main.js): quest'ultima dice quali slider la modalità ignora e come
+   chiama quelli che usa con un altro significato.
 5. Aggiungi uno shot in `shotkit.config.mjs` con i parametri che la mostrano.
 6. Aggiungi una voce in `NAMED_PRESETS`, con il `t` che serve se la modalità è
    una di quelle che a tempo zero non hanno ancora risolto.

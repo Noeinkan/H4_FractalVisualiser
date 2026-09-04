@@ -86,6 +86,24 @@ macchia quasi piatta e ci metterebbero qualche secondo a diventare quello che il
 nome promette. Appena tocchi uno slider il menu torna a `—`: la vista non è più
 quel preset.
 
+### Il pannello segue la modalità
+
+Gli slider sono gli stessi per tutte le modalità, ma ognuna li usa a modo suo, e
+il pannello lo dice invece di lasciartelo scoprire:
+
+- **I nomi cambiano.** In Henna «Petali» diventa *Seme del piatto*, «Iterazioni»
+  diventa *Corone* e «Bloom» *Peso del tratto*; in Muqarnas *Lobi delle nicchie*
+  e *Gironi*; nella Cupola *Lobi della rosetta*. Il valore e il permalink non
+  cambiano — cambia solo il nome sotto cui lo leggi.
+- **Gli slider che quella modalità non legge si spengono**, sbiaditi e non
+  trascinabili: «Petali» in Kaleido IFS, Girih, Julia e Shamsa. Il valore resta
+  dov'era, e torna vivo appena passi a una modalità che lo usa, così un
+  permalink ricevuto da qualcun altro non perde nulla.
+- **`Random` pesca dentro la modalità corrente**: iterazioni entro il tetto del
+  suo ciclo, inquadratura attorno a quella per cui è tarata, e nessuna velocità
+  sulle tre modalità che hanno un alto (Mihrab, Henna, Muqarnas) — girarle
+  significherebbe solo vederle storte.
+
 ### Su schermo stretto
 
 Sotto i 620 px di larghezza il pannello diventa un foglio in basso, con gli

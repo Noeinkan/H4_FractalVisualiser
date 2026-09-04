@@ -149,6 +149,41 @@
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
+  // What each mode does with the sliders. The uniforms are shared but their
+  // meaning is not: `petals` is a petal count in Floral, the seed of the whole
+  // composition in Henna, the lobes of a niche in Muqarnas — and four modes
+  // never read it at all. The panel follows the mode: a knob the shader ignores
+  // goes inert, a knob whose meaning shifts takes the name that mode gives it.
+  //
+  // This is labelling only. `state`, the hash and the presets are untouched, so
+  // a permalink written under one mode still restores whole under another, and
+  // an inert slider keeps its value instead of losing it. `bloom` is never
+  // listed inert: in modes 0-7 it still rides the tonemap in main(), and in 8-9
+  // it is the stroke weight.
+  //
+  // `upright` marks the modes that have an up (their preset parks the clock, see
+  // applyMode): Random must not set them spinning through main()'s u_time turn.
+  const MODE_UI = {
+    0: { inert: ["petals"] },
+    1: {},
+    2: { inert: ["petals"] },
+    3: { inert: ["petals"] },
+    4: { inert: ["petals"] },
+    5: { names: { petals: "Lobi della rosetta", iterations: "Anelli per tessera" } },
+    6: { names: { petals: "Punte della stella", iterations: "Corsi" } },
+    7: { upright: true, names: { petals: "Lobi dei fiori" } },
+    8: { upright: true, names: {
+           petals: "Seme del piatto", iterations: "Corone",
+           complexity: "Densità del motivo", bloom: "Peso del tratto",
+           speed: "Rotazione" } },
+    9: { upright: true, names: {
+           petals: "Lobi delle nicchie", iterations: "Gironi",
+           complexity: "Densità del motivo", bloom: "Peso del tratto",
+           speed: "Rotazione" } },
+  };
+
+  const isInert = (mode, id) => (MODE_UI[mode]?.inert || []).includes(id);
+
   // ---------- State ----------
   const state = {
     mode:       1,      // start on Floral (feels closer to the reference images)
@@ -309,8 +344,37 @@
     schedulePersist();
   });
 
-  // Applies a mode: adjusts the iteration range it can actually use, and
-  // (on user interaction only) its preset + a fresh framing.
+  // ---------- Adaptive panel ----------
+  // The names come from the markup, so the table above only has to list the
+  // modes that rename something; everything else falls back to the default.
+  const SLIDER_IDS = ["symmetry", "petals", "zoom", "iterations", "complexity", "speed", "bloom"];
+  const INERT_TIP  = "Questa modalità non legge questo parametro.";
+
+  const sliders = SLIDER_IDS.map(id => {
+    const el = $(id);
+    if (!el) return null;
+    const label = el.closest("label");
+    const name  = label && label.querySelector(".name");
+    return { id, el, label, name, base: name ? name.textContent : "" };
+  }).filter(Boolean);
+
+  function syncPanel(mode) {
+    const ui = MODE_UI[mode] || {};
+    for (const s of sliders) {
+      const inert = isInert(mode, s.id);
+      if (s.name) s.name.textContent = ui.names?.[s.id] || s.base;
+      if (s.label) {
+        s.label.classList.toggle("inert", inert);
+        s.label.title = inert ? INERT_TIP : "";
+      }
+      // Disabled only blocks the pointer: setControl still reaches it, so a
+      // permalink carrying a value for an inert slider restores intact.
+      s.el.disabled = inert;
+    }
+  }
+
+  // Applies a mode: adjusts the iteration range it can actually use, relabels
+  // the panel, and (on user interaction only) its preset + a fresh framing.
   function applyMode(mode, usePresets) {
     state.mode = mode;
     const sel = $("mode");
@@ -321,6 +385,7 @@
       it.max = String(MODE_ITER_MAX[mode] ?? 12);
       setControl("iterations", it.value);   // re-clamp + refresh the readout
     }
+    syncPanel(mode);
 
     if (usePresets) {
       const preset = modePresets[mode];
@@ -348,16 +413,32 @@
     $("pause").textContent = state.paused ? "Play" : "Pausa";
   });
 
+  // Random draws inside what the current mode can use, not inside one range for
+  // all ten: a field of view that frames the floral garden loses the henna plate
+  // off the edges, an iteration count above the mode's loop bound is dead travel,
+  // and a spin on an upright mode just tilts it.
   $("randomize").addEventListener("click", () => {
-    const rnd = (a, b) => a + Math.random() * (b - a);
+    const mode = state.mode;
+    const ui   = MODE_UI[mode] || {};
+    const rnd  = (a, b) => a + Math.random() * (b - a);
+
     setControl("symmetry",   Math.floor(rnd(4, 16)));
     setControl("complexity", rnd(0.7, 1.6).toFixed(2));
-    setControl("iterations", Math.floor(rnd(4, 11)));
-    setControl("zoom",       rnd(0.8, 2.5).toFixed(2));
-    setControl("speed",      rnd(0.1, 0.8).toFixed(2));
+    setControl("iterations", Math.floor(rnd(3, (MODE_ITER_MAX[mode] ?? 12) + 1)));
+    // Around the framing the mode was tuned for: the presets already know
+    // whether this mode wants a wide field or a deep zoom.
+    const zBase = modePresets[mode]?.zoom ?? state.zoom;
+    setControl("zoom",       clamp(zBase * rnd(0.7, 1.35), ZOOM_MIN, ZOOM_MAX).toFixed(2));
     setControl("bloom",      rnd(0.4, 1.3).toFixed(2));
-    setControl("petals",     Math.floor(rnd(3, 12)));
+    if (!isInert(mode, "petals")) setControl("petals", Math.floor(rnd(3, 12)));
     setControl("palette",    Math.floor(Math.random() * $("palette").options.length));
+
+    if (ui.upright) {
+      setControl("speed", 0);
+      timeAccum = 0;              // as in applyMode: a still plate must start level
+    } else {
+      setControl("speed", rnd(0.1, 0.8).toFixed(2));
+    }
   });
 
   if ($("reset")) {

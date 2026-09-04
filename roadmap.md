@@ -10,6 +10,7 @@ piano già concordato: scadenze e priorità vanno confermate.
 - [x] Modalità 8: composizione delle corone generata dal seme «petali» invece che fissa <!-- size: L; done: 2026-09-04 -->
 - [x] Modalità 9 (Muqarnas): volta a stalattiti vista dal basso <!-- size: L; done: 2026-08-31 -->
 - [x] Pannello controlli: simmetria, petali, zoom, iterazioni, complessità, velocità, palette, bloom <!-- size: M; done: 2026-08-30 -->
+- [x] Pannello adattivo: slider spenti dove la modalità non li legge, nomi e Random per modalità <!-- size: M; done: 2026-09-04 -->
 - [x] Pan, rotazione con Shift, zoom ancorato al puntatore, pinch <!-- size: M; done: 2026-08-30 -->
 - [x] Permalink nell'hash e ripristino da localStorage <!-- size: M; done: 2026-08-30 -->
 - [x] Export PNG del frame corrente <!-- size: S; done: 2026-08-30 -->
