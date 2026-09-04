@@ -46,6 +46,7 @@
 
   // ---------- GL program (rebuildable, for context loss) ----------
   let prog = null, buf = null, U = null, ready = false, hasDerivatives = false;
+  let maxDim = 4096;   // largest drawing buffer this GL will accept, read in buildGL
 
   function compile(type, src, label) {
     const sh = gl.createShader(type);
@@ -111,6 +112,11 @@
     ]) {
       U[name] = gl.getUniformLocation(prog, "u_" + name);
     }
+
+    // The hard ceiling on an export: a drawing buffer wider than this is not a
+    // slow render, it is a GL error and a blank PNG.
+    const dims = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+    maxDim = Math.min(dims ? Math.min(dims[0], dims[1]) : 4096, 16384);
 
     ready = true;
     if (!hasDerivatives) {
@@ -337,15 +343,21 @@
 
   const touchInput = () => { interactUntil = performance.now() + SETTLE_MS; };
 
-  function setBuffer(scale) {
-    const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP) * scale;
-    const w = Math.max(1, Math.round(window.innerWidth  * dpr));
-    const h = Math.max(1, Math.round(window.innerHeight * dpr));
+  // The one place the drawing buffer changes size. The export goes through it
+  // too, which is why it takes pixels and not a scale.
+  function setBufferExact(w, h) {
+    w = Math.max(1, Math.round(w));
+    h = Math.max(1, Math.round(h));
     if (w === bufW && h === bufH) return;
     canvas.width  = bufW = w;
     canvas.height = bufH = h;
     gl.viewport(0, 0, w, h);
     markDirty();
+  }
+
+  function setBuffer(scale) {
+    const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP) * scale;
+    setBufferExact(window.innerWidth * dpr, window.innerHeight * dpr);
   }
 
   function resize(force) {
@@ -563,23 +575,101 @@
     $("panel").classList.add("collapsed");
   }
 
+  // ---------- PNG export ----------
+  // The window is not the poster. The export gives itself a drawing buffer of
+  // the size you asked for — the screen has nothing to do with it — optionally
+  // renders it larger still and boxes it down, which is the only antialiasing
+  // that helps where `FW()` has already given up: the filaments of modes 0, 2
+  // and 3 at high iteration counts.
+  //
+  // Rendering bigger is not only bigger. Modes 6 and 7 drop each IFS level once
+  // its step falls under a pixel, so more pixels means more levels survive: a
+  // 4096 px export of the mihrab has vine the screen never showed.
+  //
+  // Two ceilings are real, and they clamp the *sampling* rather than the size
+  // you asked for: `maxDim` (past it GL fails and the PNG comes out blank) and
+  // memory, four bytes a pixel for the buffer plus the same again for the copy
+  // the encoder gets.
+  const EXPORT_MAX_PIXELS = 80e6;
+
+  function exportPlan() {
+    const longEdge = parseInt(($("exportSize") || {}).value || "0", 10) || 0;
+    const wanted   = clamp(parseInt(($("exportSS") || {}).value || "1", 10) || 1, 1, 4);
+    const vw = Math.max(1, window.innerWidth);
+    const vh = Math.max(1, window.innerHeight);
+
+    let w, h;
+    if (longEdge > 0) {
+      // The window's aspect is kept: the shader maps uv on min(resolution), so
+      // a different shape would reframe the scene instead of enlarging it.
+      const k = longEdge / Math.max(vw, vh);
+      w = Math.round(vw * k);
+      h = Math.round(vh * k);
+    } else {
+      const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+      w = Math.round(vw * dpr);
+      h = Math.round(vh * dpr);
+    }
+
+    // If even one sample per pixel does not fit, the requested size itself has
+    // to come down — and that the user must be told about.
+    let clamped = false;
+    const fits = s => Math.max(w, h) * s <= maxDim && w * h * s * s <= EXPORT_MAX_PIXELS;
+    while (w > 16 && !fits(1)) { w = Math.round(w * 0.85); h = Math.round(h * 0.85); clamped = true; }
+    let ss = wanted;
+    while (ss > 1 && !fits(ss)) ss -= 1;
+
+    return { w, h, ss, clamped, downgraded: ss < wanted };
+  }
+
   function saveScreenshot() {
     if (!ready) return;
-    // Full resolution whatever the adaptive scale is doing, then draw and
-    // snapshot within the same task: without preserveDrawingBuffer the
-    // backbuffer is only guaranteed valid until the browser composites.
-    interactUntil = 0;
-    setBuffer(1);
+    const plan = exportPlan();
+    // The notice has to be on screen before the export locks the main thread,
+    // which at 4096×2 is a second or more: hence one frame of delay.
+    showNotice(`Esporto ${plan.w}×${plan.h}${plan.ss > 1 ? ` a ×${plan.ss}` : ""}…`);
+    requestAnimationFrame(() => runExport(plan));
+  }
+
+  function runExport(plan) {
+    interactUntil = 0;                       // no adaptive downscaling here
+    setBufferExact(plan.w * plan.ss, plan.h * plan.ss);
     dirty = true;
     render();
-    canvas.toBlob(b => {
-      if (!b) return;
+
+    // Copy into a 2D canvas in the same task as the draw. Without
+    // preserveDrawingBuffer the backbuffer is only guaranteed valid until the
+    // browser composites, and drawImage is what makes the pixels ours — after
+    // this line the GL buffer can go back to being window-sized while the PNG
+    // encoder takes its time.
+    const off = document.createElement("canvas");
+    off.width  = plan.w;
+    off.height = plan.h;
+    const ctx2 = off.getContext("2d");
+    ctx2.imageSmoothingEnabled = true;
+    ctx2.imageSmoothingQuality = "high";
+    ctx2.drawImage(canvas, 0, 0, plan.w, plan.h);
+
+    resize(true);
+
+    off.toBlob(b => {
+      if (!b) {
+        showNotice("Esportazione fallita: il browser non ha prodotto il PNG.", { timeout: 5000 });
+        return;
+      }
       const a = document.createElement("a");
       const url = URL.createObjectURL(b);
       a.href = url;
-      a.download = `fractal_m${state.mode}_s${state.symmetry}_${Date.now()}.png`;
+      a.download = `fractal_m${state.mode}_s${state.symmetry}_${plan.w}x${plan.h}_${Date.now()}.png`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      const why = plan.clamped
+        ? ` — ridotto: questa GPU non regge oltre ${maxDim} px di lato`
+        : plan.downgraded
+          ? " — sovracampionamento ridotto per stare nei limiti della GPU"
+          : "";
+      showNotice(`PNG ${plan.w}×${plan.h} salvato${why}.`, { timeout: why ? 6000 : 2600 });
     });
   }
 

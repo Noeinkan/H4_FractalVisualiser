@@ -158,6 +158,25 @@
       <input type="range" id="bloom" min="0" max="2" step="0.01" value="0.85" />
     </div>
 
+    <!-- Export size is independent of the window; ×N renders that many samples
+         per pixel and boxes them down. See exportPlan() in main.js. -->
+    <div class="ctl wide">
+      <div class="head"><label class="name" for="exportSize">Esporta PNG</label></div>
+      <div class="pair">
+        <select id="exportSize">
+          <option value="0" selected>Come la finestra</option>
+          <option value="2048">2048 px di lato lungo</option>
+          <option value="4096">4096 px di lato lungo</option>
+          <option value="8192">8192 px di lato lungo</option>
+        </select>
+        <select id="exportSS" title="Campioni per pixel: più alto = bordi più puliti, export più lento">
+          <option value="1">×1</option>
+          <option value="2" selected>×2</option>
+          <option value="3">×3</option>
+        </select>
+      </div>
+    </div>
+
     <div class="row">
       <button id="pause">Pausa</button>
       <button id="randomize">Random</button>

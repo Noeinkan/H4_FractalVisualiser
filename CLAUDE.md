@@ -81,7 +81,7 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   velocità 0 (vale anche per le modalità 8 e 9). Un preset nuovo che dipende
   dall'orientamento deve fare lo stesso.
 - **Un preset nominato è un permalink, non un secondo tipo di stato.**
-  `NAMED_PRESETS` in [main.js](main.js#L289) tiene stringhe nello stesso formato
+  `NAMED_PRESETS` in [main.js](main.js#L295) tiene stringhe nello stesso formato
   che `serialize()` scrive, e sceglierne una passa per `deserialize` +
   `applyState`, cioè per la stessa strada dell'hash. Non aggiungere un percorso
   parallelo che scriva su `state`: si perderebbero il ri-clamp delle iterazioni
@@ -95,13 +95,31 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   decidere se aprirlo o no al caricamento. Sono due linguaggi, non c'è modo di
   condividerne una sola: se la sposti, spostala in entrambi.
 - **`preserveDrawingBuffer` è disattivato di proposito** (costa a ogni frame).
-  L'export PNG disegna e cattura nello stesso task: se tocchi `saveScreenshot`
-  in [main.js](main.js#L566), quell'invariante va mantenuta.
+  Quindi l'export deve disegnare e *copiare* nello stesso task: `runExport()` in
+  [main.js](main.js#L634) fa `render()` e subito un `drawImage` su una canvas 2D,
+  ed è quella copia che poi va a `toBlob`. Passare la canvas GL direttamente
+  all'encoder funziona per caso — finché nessuno ridimensiona il buffer prima
+  che l'encoder legga. Se tocchi l'export, la copia resta.
+- **L'export non ha niente a che vedere con la finestra.** `exportPlan()` in
+  [main.js](main.js#L595) calcola una dimensione a partire dal lato lungo scelto
+  nel pannello (conservando l'aspetto della finestra, perché lo shader mappa uv
+  su `min(resolution)` e un rapporto diverso reinquadrerebbe la scena invece di
+  ingrandirla) e la moltiplica per i campioni per pixel; `setBufferExact()` dà a
+  GL quel buffer, e la riduzione a valle è l'antialiasing. Due tetti sono veri e
+  clampano il *campionamento*, non la dimensione richiesta: `maxDim` — letto da
+  `MAX_VIEWPORT_DIMS` in `buildGL()`, oltre il quale GL non disegna e il PNG
+  esce vuoto — e `EXPORT_MAX_PIXELS`, che è memoria. Se anche a ×1 non ci sta,
+  allora scende la dimensione, e in quel caso il notice lo dice.
+- **Rendere più grande non è solo più grande.** Le modalità 6 e 7 dissolvono
+  ogni livello IFS quando il suo passo scende sotto il pixel: più pixel = più
+  livelli sopravvivono, quindi un export a 4096 px del mihrab ha viticci che
+  sullo schermo non c'erano. Vale la pena saperlo prima di inseguire una
+  differenza fra schermo e PNG credendola un bug.
 - **`MODE_ITER_MAX`** in [main.js](main.js#L148) deve restare allineato ai bound
   dei loop nello shader. Se cambi il `for (int i = 0; i < N; i++)` di una
   modalità, aggiorna anche la voce corrispondente, altrimenti lo slider ha una
   coda inerte.
-- **`MODE_UI`** in [main.js](main.js#L210) dice cosa ogni modalità fa degli
+- **`MODE_UI`** in [main.js](main.js#L216) dice cosa ogni modalità fa degli
   slider, e `syncPanel()` lo applica: `inert` spegne e sbiadisce un controllo
   che lo shader non legge, `names` gli dà il nome che quella modalità gli dà
   davvero (in modalità 8 «Petali» è il seme del piatto), `upright` marca le
@@ -126,12 +144,12 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   sessanta volte al secondo. Oltre i 300 s la manopola si ferma in fondo e il
   numero continua: la manopola può bloccarsi, il readout non può mentire.
 - **`t`, `h` e `k` sono arrivati dopo i primi permalink condivisi.** `HASH_LATE`
-  in [main.js](main.js#L597) dà loro un valore di default quando mancano
+  in [main.js](main.js#L687) dà loro un valore di default quando mancano
   dall'hash, così un vecchio URL rende come rendeva invece di ereditare tinta e
   orologio dalla vista precedente. Ogni chiave nuova va aggiunta lì.
 - **La traccia del campo visivo è esponenziale.** `min`/`max` di `#zoom`
   nell'HTML sono unità di traccia, non valori di zoom: la conversione sta tutta
-  in `SLIDERS`, `toSlider` e `fromSlider` ([main.js](main.js#L158)), e chi chiama
+  in `SLIDERS`, `toSlider` e `fromSlider` ([main.js](main.js#L164)), e chi chiama
   `setControl` parla sempre in valori. Effetto collaterale accettato: un valore
   che arriva dall'hash viene riquantizzato dello 0.2% circa (`z=2.8` torna
   `2.801`). Se aggiungi un'altra traccia logaritmica, dichiarala lì e basta.
@@ -191,13 +209,14 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   aggiungi qualcosa fuori, tienilo entro il finale di bordo (r ≈ 1.46), che è
   ciò che il campo visivo 3.2 del preset inquadra.
 - **La risoluzione cala mentre la scena si muove.** `setBuffer()` in
-  [main.js](main.js#L340) ridimensiona il drawing buffer: `renderScale` scende
+  [main.js](main.js#L348) ridimensiona il drawing buffer: `renderScale` scende
   fino a 0.45 quando le frame superano i 24 ms e risale quando ne bastano 13, ma
   solo durante l'animazione, un drag o uno slider. Passati 220 ms dall'ultimo
   input il buffer torna a piena risoluzione e disegna una frame nitida. Quindi
   ogni nuovo percorso di input deve chiamare `touchInput()` accanto a
   `markDirty()`, altrimenti manipola l'immagine grande; e chi cattura pixel
-  (`saveScreenshot`) deve forzare `setBuffer(1)` prima di disegnare.
+  (`runExport`) si dà il buffer che vuole con `setBufferExact()` e poi rimette a
+  posto con `resize(true)`.
 - **Velocità 0 vuol dire nessuna frame, non frame lente.** `frame()` avanza
   `state.time` e sporca la scena solo se `state.speed !== 0`: le modalità 7, 8 e
   9 sono ferme per preset e senza quel controllo ridisegnano un'immagine

@@ -267,6 +267,14 @@ select {
   width: 100%;
 }
 
+/* Two selects that belong to one control: size and sampling of the export. */
+.pair {
+  display: flex;
+  gap: 6px;
+}
+.pair select:first-child { flex: 1 1 auto; min-width: 0; }
+.pair select:last-child  { flex: 0 0 auto; width: auto; }
+
 /* ---- Narrow screens ----------------------------------------------------
    The 260px panel pinned to the top right eats a phone's whole viewport, so
    below this breakpoint it becomes a bottom sheet: full width, capped height,

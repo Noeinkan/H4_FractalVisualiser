@@ -74,10 +74,11 @@ Interazione sul canvas:
 | rotella / pinch | zoom ancorato al puntatore |
 | doppio click | fullscreen |
 
-Il pannello a destra si apre e chiude col pulsante `☰`. `PNG` esporta il frame
-corrente, `Random` genera una combinazione di parametri, `Varia` ne sposta di
-poco quelli che hai lasciato liberi, `Centra` azzera pan e rotazione. La riga
-sotto — `↶ ↷ A/B ★` — è il banco di regolazione, qui sotto.
+Il pannello a destra si apre e chiude col pulsante `☰`. `PNG` esporta l'immagine
+alla dimensione scelta nel menu sopra, `Random` genera una combinazione di
+parametri, `Varia` ne sposta di poco quelli che hai lasciato liberi, `Centra`
+azzera pan e rotazione. La riga sotto — `↶ ↷ A/B ★` — è il banco di
+regolazione, più giù.
 
 In cima al pannello c'è **Preset**: una dozzina di viste già composte, una per
 modalità più qualche variante. Sceglierne una installa lo stato completo —
@@ -136,6 +137,28 @@ vuoi tu (le modalità 0, 2, 3 e 4 hanno bisogno di qualche secondo prima di
 risolvere), e **Tinta** e **Saturazione** ritoccano il colore *dopo* la palette,
 in tutte e dieci le modalità. Nelle due a inchiostro la tinta muove anche la
 carta: lo stesso piatto su carta calda o fredda sono due poster diversi.
+
+### Esportare un PNG
+
+Il menu **Esporta PNG** decide due cose diverse.
+
+La prima è la dimensione, e non ha niente a che vedere con la finestra: «come la
+finestra» scrive quello che vedi, gli altri valori sono il lato lungo del file —
+fino a 8192 px — con l'aspetto della finestra conservato. Non è solo un
+ingrandimento: le modalità 6 e 7 fanno sparire ogni livello di ricorsione quando
+il suo passo scende sotto il pixel, quindi un mihrab a 4096 px ha viticci che
+sullo schermo non c'erano.
+
+La seconda è **×1 / ×2 / ×3**, i campioni per pixel: si disegna quel tanto più
+grande e si riduce. Sulle modalità a inchiostro cambia poco — quelle hanno già
+un antialiasing analitico — ma su Kaleido IFS, Girih e Julia a molte iterazioni
+è la differenza fra filamenti continui e una manciata di pixel isolati. Il
+valore predefinito è ×2.
+
+Un export grande blocca la pagina per qualche secondo: è normale, e il messaggio
+in basso dice a che dimensione sta lavorando. Se la GPU non regge la misura
+richiesta, l'app abbassa prima i campioni e poi, solo se serve, la dimensione —
+e in quel caso te lo scrive invece di darti un file grande e vuoto.
 
 ### Su schermo stretto
 

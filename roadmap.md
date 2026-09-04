@@ -74,8 +74,14 @@ di ereditarle dalla vista precedente.
 
 ## Milestone: Qualità del rendering
 
-- [ ] Supersampling opzionale per l'export PNG <!-- size: M -->
-- [ ] Export a risoluzione scelta, indipendente dalla finestra <!-- size: M -->
+L'export non passa più per la finestra: `exportPlan()` sceglie la dimensione e i
+campioni per pixel, `setBufferExact()` dà a GL il buffer che serve e la riduzione
+a valle è l'antialiasing. I due tetti veri — `MAX_VIEWPORT_DIMS` e la memoria —
+abbassano prima il campionamento e solo in ultima istanza la dimensione, con un
+avviso. Restano le due voci di prestazione, che vogliono hardware vero.
+
+- [x] Supersampling opzionale per l'export PNG <!-- size: M; done: 2026-09-04 -->
+- [x] Export a risoluzione scelta, indipendente dalla finestra <!-- size: M; done: 2026-09-04 -->
 - [ ] Limitare il costo per frame sulle modalità pesanti a molte iterazioni <!-- size: L -->
 - [ ] Verifica su GPU integrata e su mobile <!-- size: M -->
 

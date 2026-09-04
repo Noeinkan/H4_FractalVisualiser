@@ -33,8 +33,9 @@ con uno stub.
 
 Elementi con id: `gl` (canvas), `notice`, `panel`, `toggle`, `controls`,
 `preset`, `mode`, `symmetry`, `petals`, `zoom`, `iterations`, `complexity`,
-`speed`, `time`, `palette`, `hue`, `sat`, `bloom`, `pause`, `randomize`, `vary`,
-`screenshot`, `reset`, `undo`, `redo`, `ab`, `saveview`.
+`speed`, `time`, `palette`, `hue`, `sat`, `bloom`, `exportSize`, `exportSS`,
+`pause`, `randomize`, `vary`, `screenshot`, `reset`, `undo`, `redo`, `ab`,
+`saveview`.
 
 Ogni controllo è un `<div class="ctl">` con dentro una `.head` — il nome
 (`<label class="name" for>`, riscritto per modalità da `syncPanel()`), il valore
@@ -89,7 +90,7 @@ IIFE che espone `window.FRACTAL_SHADER = { VERT, FRAG_BODY }`. `FRAG_BODY`
 L'ordine delle funzioni nel file non segue quello delle modalità: il dispatch in
 `main()` è la sola fonte affidabile.
 
-## [main.js](main.js) — 891 righe
+## [main.js](main.js) — 981 righe
 
 IIFE in `"use strict"`. Sezioni, nell'ordine in cui compaiono:
 
@@ -99,18 +100,18 @@ IIFE in `"use strict"`. Sezioni, nell'ordine in cui compaiono:
 | [29](main.js#L29) | Contesto GL | `GL_OPTS`, `getContext`, uscita se WebGL manca |
 | [47](main.js#L47) | Programma GL | `compile()`, `buildGL()`, header `FW()`, uniform in `U` |
 | [129](main.js#L129) | Context loss | listener `webglcontextlost` / `restored` |
-| [142](main.js#L142) | Costanti | `ZOOM_MIN/MAX`, `MODE_ITER_MAX`, `SLIDERS` + `toSlider`/`fromSlider`, `MODE_UI`, `clamp` |
-| [236](main.js#L236) | Stato | oggetto `state`, `modePresets` per modalità |
-| [289](main.js#L289) | `NAMED_PRESETS` | le viste nominate del menu: permalink + `t` iniziale |
-| [324](main.js#L324) | Resize + risoluzione adattiva | `setBuffer()`, `renderScale`, `touchInput()` |
-| [358](main.js#L358) | UI | `$`, `setControl`, `bindRange`, i bottoni, Random per modalità |
-| [426](main.js#L426) | Pannello adattivo | `sliders`, `syncPanel()`, `applyMode()` |
-| [455](main.js#L455) | Banco di regolazione | crea `tuning` da `tuning.js`, o lo stub se manca |
-| [566](main.js#L566) | Screenshot | `saveScreenshot` — piena risoluzione, cattura nello stesso task |
-| [586](main.js#L586) | Permalink | `serialize`/`deserialize`/`applyState`/`persist`, `HASH_MAP`, restore |
-| [685](main.js#L685) | Menu dei preset | riempie `#preset` e installa la vista scelta |
-| [711](main.js#L711) | Interazione | `clientToUV`, `panBy`, `zoomAt`, pointer, pinch, wheel |
-| [818](main.js#L818) | Render loop | `render()` on-demand, `adapt()` e `frame()` |
+| [148](main.js#L148) | Costanti | `ZOOM_MIN/MAX`, `MODE_ITER_MAX`, `SLIDERS` + `toSlider`/`fromSlider`, `MODE_UI`, `clamp` |
+| [242](main.js#L242) | Stato | oggetto `state`, `modePresets` per modalità |
+| [295](main.js#L295) | `NAMED_PRESETS` | le viste nominate del menu: permalink + `t` iniziale |
+| [330](main.js#L330) | Resize + risoluzione adattiva | `setBufferExact()`/`setBuffer()`, `renderScale`, `touchInput()` |
+| [370](main.js#L370) | UI | `$`, `setControl`, `bindRange`, i bottoni, Random per modalità |
+| [438](main.js#L438) | Pannello adattivo | `sliders`, `syncPanel()`, `applyMode()` |
+| [467](main.js#L467) | Banco di regolazione | crea `tuning` da `tuning.js`, o lo stub se manca |
+| [578](main.js#L578) | Export PNG | `exportPlan()`, `runExport()` — dimensione scelta, sovracampionamento, copia nello stesso task |
+| [676](main.js#L676) | Permalink | `serialize`/`deserialize`/`applyState`/`persist`, `HASH_MAP`, restore |
+| [775](main.js#L775) | Menu dei preset | riempie `#preset` e installa la vista scelta |
+| [801](main.js#L801) | Interazione | `clientToUV`, `panBy`, `zoomAt`, pointer, pinch, wheel |
+| [908](main.js#L908) | Render loop | `render()` on-demand, `adapt()` e `frame()` |
 
 Concetti chiave: `dirty`/`markDirty()` (si disegna solo quando serve),
 `renderScale` (il buffer si restringe mentre la scena si muove),
@@ -139,7 +140,7 @@ questo che l'annulla è una pila di stringhe.
 | [276](tuning.js#L276) | `applyZones()` — dipinge la banda della zona utile sulla traccia |
 | [297](tuning.js#L297) | Bottoni e tasti — Ctrl+Z, Ctrl+Maiusc+Z, B, V |
 
-## [style.css](style.css) — 316 righe
+## [style.css](style.css) — 324 righe
 
 Variabili di tema in `:root` ([1](style.css#L1)). Blocchi: `#gl`
 ([22](style.css#L22)), `#notice` e la variante `.fatal` ([39](style.css#L39)),
