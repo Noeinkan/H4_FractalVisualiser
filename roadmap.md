@@ -50,6 +50,28 @@ diventa un foglio in basso con gli slider su due colonne e parte chiuso.
 - [x] Preset nominati selezionabili dal pannello <!-- size: M; done: 2026-09-04 -->
 - [x] Pannello usabile su schermo stretto <!-- size: M; done: 2026-09-04 -->
 
+## Milestone: Tunabilità
+
+Chiusa. Tre limiti diversi, tutti e tre chiusi: non si poteva tornare indietro
+da una regolazione, col mouse non si raggiungevano i valori bassi del campo
+visivo, e il colore aveva un solo grado di libertà. La storia, lo slot A/B, i
+lucchetti, `Varia`, le viste salvate, i readout scrivibili e le bande di zona
+vivono in `tuning.js`, che passa solo per la stringa del permalink e non tocca
+né GL né `state`. L'hash ha tre chiavi nuove — `t` l'orologio, `h` la tinta, `k`
+la saturazione — e un permalink più vecchio le ritrova ai valori neutri invece
+di ereditarle dalla vista precedente.
+
+- [x] Annulla e ripeti su una pila di stati serializzati, alimentata da `schedulePersist` <!-- size: M; done: 2026-09-04 -->
+- [x] Confronto A/B: parcheggia una vista in uno slot e alternala con quella corrente <!-- size: S; done: 2026-09-04 -->
+- [x] `t` nel permalink e scrubber del tempo, per fermare una modalità animata dove rende <!-- size: M; done: 2026-09-04 -->
+- [x] Doppio click su uno slider: torna al valore che `modePresets` dà a questa modalità <!-- size: S; done: 2026-09-04 -->
+- [x] Campo visivo su scala logaritmica, precisione relativa costante <!-- size: S; done: 2026-09-04 -->
+- [x] Valore digitabile al posto del readout <!-- size: S; done: 2026-09-04 -->
+- [x] Lucchetto per slider e pulsante «Varia»: mutazione ±15% dei soli parametri liberi <!-- size: M; done: 2026-09-04 -->
+- [x] Trim di tinta e saturazione applicati dopo il dispatch in `main()` <!-- size: M; done: 2026-09-04 -->
+- [x] Viste salvate dall'utente accanto ai preset nominati, in localStorage <!-- size: M; done: 2026-09-04 -->
+- [x] Banda della zona utile sulla traccia degli slider, per modalità, senza toccare min/max <!-- size: M; done: 2026-09-04 -->
+
 ## Milestone: Qualità del rendering
 
 - [ ] Supersampling opzionale per l'export PNG <!-- size: M -->

@@ -128,34 +128,66 @@ button:hover, select:hover { background: rgba(60, 100, 170, 0.55); }
   margin-top: 4px;
 }
 
-label {
+/* One control: the head line (name, readout, padlock) over the input. */
+.ctl {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 11px;
   color: var(--muted);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-/* Only the readout is the accent-coloured monospace half of a label: the name
-   half is rewritten per mode and stays in the panel's own type. */
-label span[data-out] {
+
+/* The readout is the accent-coloured monospace half of the head line — and it
+   is contenteditable, so it needs to look typeable once you are in it. */
+[data-out] {
   color: var(--accent);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11px;
+  cursor: text;
+  border-radius: 3px;
+  padding: 0 2px;
 }
+[data-out]:hover  { background: rgba(120, 180, 255, 0.12); }
+[data-out]:focus  { outline: 1px solid var(--accent); background: rgba(120, 180, 255, 0.14); }
+
+/* The padlock keeps a control out of Random and Varia. Off it is nearly
+   invisible: it must not compete with the value for attention. */
+.lock {
+  flex: 0 0 auto;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.28;
+  filter: grayscale(1);
+}
+.lock:hover { background: none; opacity: 0.7; }
+.ctl.locked .lock { opacity: 1; filter: none; }
+.ctl.locked .name { color: var(--accent); }
 
 /* A mode that never reads a uniform gets its slider dimmed and disabled rather
    than removed: the panel keeps the same shape (nothing jumps when the mode
    changes) and the value keeps living in the permalink — it just stops
    pretending the knob does something. */
-label.inert { opacity: 0.4; }
-label.inert input[type="range"] {
+.ctl.inert { opacity: 0.4; }
+.ctl.inert input[type="range"] {
   filter: grayscale(1);
   cursor: not-allowed;
 }
-label.inert input[type="range"]::-webkit-slider-thumb { background: #7f8aa0; box-shadow: none; }
-label.inert input[type="range"]::-moz-range-thumb     { background: #7f8aa0; }
+.ctl.inert input[type="range"]::-webkit-slider-thumb { background: #7f8aa0; box-shadow: none; }
+.ctl.inert input[type="range"]::-moz-range-thumb     { background: #7f8aa0; }
 
 input[type="range"] {
   -webkit-appearance: none;
@@ -165,6 +197,19 @@ input[type="range"] {
   border-radius: 2px;
   background: linear-gradient(90deg, #1a3a70, #4a90e2);
   outline: none;
+}
+
+/* The band each mode is tuned for, painted on the track. It suggests without
+   forbidding: min and max stay put, because narrowing them per mode would clamp
+   the values of a permalink arriving from another mode. The two stops are set
+   by tuning.js, which knows the (possibly exponential) scale of the track. */
+input[type="range"].zoned {
+  background-image:
+    linear-gradient(90deg,
+      transparent 0 var(--zone-a),
+      rgba(255, 210, 122, 0.30) var(--zone-a) var(--zone-b),
+      transparent var(--zone-b) 100%),
+    linear-gradient(90deg, #1a3a70, #4a90e2);
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -197,6 +242,18 @@ input[type="range"]::-moz-range-thumb {
   min-width: 54px;
   padding: 6px 6px;
 }
+/* History and A/B: gestures you repeat while comparing two views, so they get
+   their own narrower row instead of competing with Random and PNG. */
+.row.mini { margin-top: 0; }
+.row.mini button {
+  min-width: 0;
+  padding: 4px 6px;
+  font-size: 13px;
+  line-height: 1.1;
+}
+.row.mini button:disabled { opacity: 0.35; cursor: default; }
+.row.mini button:disabled:hover { background: rgba(30, 50, 90, 0.55); }
+#ab.armed { border-color: rgba(255, 210, 122, 0.6); color: #ffd27a; }
 
 .hint {
   font-size: 10px;
@@ -238,21 +295,11 @@ select {
     grid-template-columns: 1fr 1fr;
     gap: 9px 12px;
   }
-  /* The selects hold long option text and the button row needs its width:
+  /* The selects hold long option text and the button rows need their width:
      everything except the sliders spans the pair of columns. */
-  #controls > label.wide,
+  #controls > .ctl.wide,
   #controls > .row,
   #controls > .hint { grid-column: 1 / -1; }
-
-  /* Name and readout share a line here. Stacked they cost a third row per
-     slider, which is what pushes the button row off the bottom of the sheet. */
-  #controls > label:not(.wide) {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: baseline;
-    gap: 3px 6px;
-  }
-  #controls > label:not(.wide) input { grid-column: 1 / -1; }
 }
 
 /* ---- Touch ----
@@ -264,4 +311,6 @@ select {
   input[type="range"]::-moz-range-thumb     { width: 22px; height: 22px; }
   button, select { padding: 9px 12px; }
   #toggle { min-width: 40px; min-height: 40px; }
+  /* The padlock is a 10px glyph on a mouse: a finger needs something to hit. */
+  .lock { padding: 4px 6px; font-size: 13px; }
 }

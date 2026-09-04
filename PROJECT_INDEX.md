@@ -11,6 +11,7 @@ H4_FractalVisualiser/
 ├── index.html            markup, canvas, pannello dei controlli
 ├── style.css             tema scuro, pannello, slider, notice
 ├── shader.js             sorgenti GLSL — window.FRACTAL_SHADER
+├── tuning.js             storia, A/B, lucchetti, viste salvate — window.FRACTAL_TUNING
 ├── main.js               contesto GL, stato, UI, permalink, input, render loop
 ├── shotkit.config.mjs    config screenshot-kit, suite di lavoro (non usata a runtime)
 ├── shotkit.readme.mjs    config screenshot-kit, le immagini del README
@@ -25,21 +26,31 @@ H4_FractalVisualiser/
 
 ## [index.html](index.html)
 
-Nessuno script inline. Carica `shader.js` prima di `main.js` — l'ordine conta:
-`main.js` legge `window.FRACTAL_SHADER` all'avvio e si ferma con un notice
-fatale se non lo trova.
+Nessuno script inline. Carica `shader.js` e `tuning.js` prima di `main.js` —
+l'ordine conta: `main.js` legge `window.FRACTAL_SHADER` all'avvio e si ferma con
+un notice fatale se non lo trova, mentre di `window.FRACTAL_TUNING` fa a meno
+con uno stub.
 
-Elementi con id, tutti letti da `main.js`: `gl` (canvas), `notice`, `panel`,
-`toggle`, `controls`, `preset`, `mode`, `symmetry`, `petals`, `zoom`,
-`iterations`, `complexity`, `speed`, `palette`, `bloom`, `pause`, `randomize`,
-`screenshot`, `reset`. Ogni slider ha due span: `<span class="name">` con il
-nome, che `syncPanel()` riscrive secondo la modalità, e `<span data-out="<id>">`
-con il valore. `#preset` ha in markup solo il segnaposto: le voci le
-aggiunge `main.js` da `NAMED_PRESETS`. La classe `wide` sui tre `<label>` che
-contengono un `<select>` è ciò che, su schermo stretto, li fa occupare entrambe
-le colonne della griglia.
+Elementi con id: `gl` (canvas), `notice`, `panel`, `toggle`, `controls`,
+`preset`, `mode`, `symmetry`, `petals`, `zoom`, `iterations`, `complexity`,
+`speed`, `time`, `palette`, `hue`, `sat`, `bloom`, `pause`, `randomize`, `vary`,
+`screenshot`, `reset`, `undo`, `redo`, `ab`, `saveview`.
 
-## [shader.js](shader.js) — 1074 righe
+Ogni controllo è un `<div class="ctl">` con dentro una `.head` — il nome
+(`<label class="name" for>`, riscritto per modalità da `syncPanel()`), il valore
+(`<span data-out="<id>">`, reso scrivibile da `tuning.js`) e il lucchetto
+(`<button class="lock" data-lock="<id>">`) — e poi l'input. Il nome è un `label`
+con `for` invece di un `<label>` che avvolge tutto proprio perché lucchetto e
+readout non vengano inghiottiti dall'attivazione dell'etichetta.
+
+`#zoom` ha `min`/`max` in unità di traccia (0–2000), non in valori di zoom: la
+traccia è esponenziale, vedi `SLIDERS` in `main.js`. `#preset` ha in markup solo
+il segnaposto: le viste nominate le aggiunge `main.js` da `NAMED_PRESETS` e
+quelle dell'utente `tuning.js` in un `<optgroup>`. La classe `wide` sui tre
+`.ctl` che contengono un `<select>` è ciò che, su schermo stretto, li fa occupare
+entrambe le colonne della griglia.
+
+## [shader.js](shader.js) — 1094 righe
 
 IIFE che espone `window.FRACTAL_SHADER = { VERT, FRAG_BODY }`. `FRAG_BODY`
 **non** contiene la riga `#extension`: la antepone `buildGL()`.
@@ -72,12 +83,13 @@ IIFE che espone `window.FRACTAL_SHADER = { VERT, FRAG_BODY }`. `FRAG_BODY`
 | [812](shader.js#L812) | `hennaBand` — una corona: fondo, motivo in ogni cella, filetto |
 | [839](shader.js#L839) | `modeHenna` — modalità 8, mandala a bande piatte generate dal seme |
 | [943](shader.js#L943) | `modeMuqarnas` — modalità 9, volta a stalattiti |
-| [1031](shader.js#L1031) | `main()` — pan/zoom/rotazione, dispatch, vignette e tonemap (solo modalità 0–7) |
+| [1038](shader.js#L1038) | `trim()` — rotazione di tinta e saturazione, per tutte le modalità |
+| [1047](shader.js#L1047) | `main()` — pan/zoom/rotazione, dispatch, vignette e tonemap (solo modalità 0–7), poi il trim |
 
 L'ordine delle funzioni nel file non segue quello delle modalità: il dispatch in
 `main()` è la sola fonte affidabile.
 
-## [main.js](main.js) — 768 righe
+## [main.js](main.js) — 891 righe
 
 IIFE in `"use strict"`. Sezioni, nell'ordine in cui compaiono:
 
@@ -87,17 +99,18 @@ IIFE in `"use strict"`. Sezioni, nell'ordine in cui compaiono:
 | [29](main.js#L29) | Contesto GL | `GL_OPTS`, `getContext`, uscita se WebGL manca |
 | [47](main.js#L47) | Programma GL | `compile()`, `buildGL()`, header `FW()`, uniform in `U` |
 | [129](main.js#L129) | Context loss | listener `webglcontextlost` / `restored` |
-| [142](main.js#L142) | Costanti | `ZOOM_MIN/MAX`, `MODE_ITER_MAX`, `MODE_UI`, `clamp` |
-| [187](main.js#L187) | Stato | oggetto `state`, `modePresets` per modalità |
-| [230](main.js#L230) | `NAMED_PRESETS` | le viste nominate del menu: permalink + `t` iniziale |
-| [266](main.js#L266) | Resize + risoluzione adattiva | `setBuffer()`, `renderScale`, `touchInput()` |
-| [300](main.js#L300) | UI | `$`, `setControl`, `bindRange`, i bottoni, Random per modalità |
-| [347](main.js#L347) | Pannello adattivo | `sliders`, `syncPanel()`, `applyMode()` |
-| [467](main.js#L467) | Screenshot | `saveScreenshot` — piena risoluzione, cattura nello stesso task |
-| [487](main.js#L487) | Permalink | `serialize`/`deserialize`/`applyState`/`persist`, `HASH_MAP`, restore |
-| [571](main.js#L571) | Menu dei preset | riempie `#preset` e installa la vista scelta |
-| [591](main.js#L591) | Interazione | `clientToUV`, `panBy`, `zoomAt`, pointer, pinch, wheel |
-| [698](main.js#L698) | Render loop | `render()` on-demand, `adapt()` e `frame()` |
+| [142](main.js#L142) | Costanti | `ZOOM_MIN/MAX`, `MODE_ITER_MAX`, `SLIDERS` + `toSlider`/`fromSlider`, `MODE_UI`, `clamp` |
+| [236](main.js#L236) | Stato | oggetto `state`, `modePresets` per modalità |
+| [289](main.js#L289) | `NAMED_PRESETS` | le viste nominate del menu: permalink + `t` iniziale |
+| [324](main.js#L324) | Resize + risoluzione adattiva | `setBuffer()`, `renderScale`, `touchInput()` |
+| [358](main.js#L358) | UI | `$`, `setControl`, `bindRange`, i bottoni, Random per modalità |
+| [426](main.js#L426) | Pannello adattivo | `sliders`, `syncPanel()`, `applyMode()` |
+| [455](main.js#L455) | Banco di regolazione | crea `tuning` da `tuning.js`, o lo stub se manca |
+| [566](main.js#L566) | Screenshot | `saveScreenshot` — piena risoluzione, cattura nello stesso task |
+| [586](main.js#L586) | Permalink | `serialize`/`deserialize`/`applyState`/`persist`, `HASH_MAP`, restore |
+| [685](main.js#L685) | Menu dei preset | riempie `#preset` e installa la vista scelta |
+| [711](main.js#L711) | Interazione | `clientToUV`, `panBy`, `zoomAt`, pointer, pinch, wheel |
+| [818](main.js#L818) | Render loop | `render()` on-demand, `adapt()` e `frame()` |
 
 Concetti chiave: `dirty`/`markDirty()` (si disegna solo quando serve),
 `renderScale` (il buffer si restringe mentre la scena si muove),
@@ -105,15 +118,39 @@ Concetti chiave: `dirty`/`markDirty()` (si disegna solo quando serve),
 `schedulePersist()` (debounce 250 ms su hash + `localStorage`, ed è anche il
 punto in cui il menu dei preset torna al segnaposto).
 
-## [style.css](style.css) — 267 righe
+## [tuning.js](tuning.js) — 342 righe
+
+IIFE che espone `window.FRACTAL_TUNING = { create(ctx) }`. Non tocca GL né
+`state`: `main.js` gli passa un contesto (`setControl`, `serialize`,
+`deserialize`, `applyState`, `persist`, `MODE_UI`, `modePresets`, `DEFAULTS`,
+`SLIDER_IDS`, `toSlider`) e riceve `{ record, isLocked, applyZones, mountViews,
+loadView }`. Tutto passa per la stringa serializzata del permalink, ed è per
+questo che l'annulla è una pila di stringhe.
+
+| Riga | Cosa |
+|---|---|
+| [45](tuning.js#L45) | Storia — `record`, `replay`, `undo`, `redo`; `persist()` è l'unico che registra |
+| [83](tuning.js#L83) | Slot A/B — parcheggia una vista e la alterna con quella corrente |
+| [102](tuning.js#L102) | Lucchetti — set in `localStorage`, letto da Random e Varia |
+| [128](tuning.js#L128) | `vary()` — nudge in unità di traccia, salta bloccati, inerti e velocità delle modalità con un alto |
+| [160](tuning.js#L160) | Viste salvate — `<optgroup>` nel menu Preset, valori `u:<nome>` |
+| [224](tuning.js#L224) | Readout scrivibili — `contenteditable`, Invio conferma, Esc annulla |
+| [259](tuning.js#L259) | Doppio click su uno slider — torna al valore di `modePresets` |
+| [276](tuning.js#L276) | `applyZones()` — dipinge la banda della zona utile sulla traccia |
+| [297](tuning.js#L297) | Bottoni e tasti — Ctrl+Z, Ctrl+Maiusc+Z, B, V |
+
+## [style.css](style.css) — 316 righe
 
 Variabili di tema in `:root` ([1](style.css#L1)). Blocchi: `#gl`
 ([22](style.css#L22)), `#notice` e la variante `.fatal` ([39](style.css#L39)),
-`#panel` con lo stato `.collapsed` ([74](style.css#L74)), controlli e slider
-([111](style.css#L111)), `label.inert` — lo slider spento dalla modalità
-([152](style.css#L152)) —, `.row` dei bottoni ([189](style.css#L189)), il
-pannello a foglio sotto i 620 px ([220](style.css#L220)) e i bersagli più grandi
-con puntatore grosso ([261](style.css#L261)).
+`#panel` con lo stato `.collapsed` ([74](style.css#L74)), bottoni e select
+([111](style.css#L111)), un controllo — `.ctl`, `.head`, `.name`, il readout
+scrivibile e il lucchetto ([132](style.css#L132)) —, `.ctl.inert` — lo slider
+spento dalla modalità ([184](style.css#L184)) —, gli slider e la banda
+`.zoned` della zona utile ([192](style.css#L192)), le due `.row` di bottoni
+([234](style.css#L234)), il pannello a foglio sotto i 620 px
+([277](style.css#L277)) e i bersagli più grandi con puntatore grosso
+([308](style.css#L308)).
 
 ## [shotkit.config.mjs](shotkit.config.mjs)
 

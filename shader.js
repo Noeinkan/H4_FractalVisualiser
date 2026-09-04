@@ -28,6 +28,8 @@
     uniform float u_petals;
     uniform vec2  u_pan;
     uniform float u_rot;
+    uniform float u_hue;      // colour trim, radians around the grey axis
+    uniform float u_sat;
 
     #define PI   3.14159265359
     #define TAU  6.28318530718
@@ -1027,6 +1029,20 @@
       return col;
     }
 
+    // Colour trim: hue rotated about the grey axis (Rodrigues, so it costs a
+    // cos and a cross product instead of an RGB→HSV round trip) and saturation
+    // scaled around luminance. It lives here, next to main(), for the same
+    // reason the tonemap does: a mode must not carry its own idea of the
+    // palette. In the flat-ink modes it moves the paper too, which is the
+    // point — the same plate on warm or on cold paper is two posters.
+    vec3 trim(vec3 c, float a, float s) {
+      c = mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, s);
+      if (a == 0.0) return c;
+      vec3 k = vec3(0.57735027);
+      float ca = cos(a), sa = sin(a);
+      return c * ca + cross(k, c) * sa + k * dot(k, c) * (1.0 - ca);
+    }
+
     // =================================================================
     void main() {
       vec2 res = u_resolution;
@@ -1065,6 +1081,10 @@
         col = col / (1.0 + col * (1.2 - 0.6 * u_bloom));
         col = pow(max(col, 0.0), vec3(0.92));
       }
+
+      // After the tonemap on purpose: both families of modes reach here with
+      // display-ready values, so the trim means the same thing in each.
+      col = max(trim(col, u_hue, u_sat), 0.0);
 
       gl_FragColor = vec4(col, 1.0);
     }

@@ -107,7 +107,7 @@
     U = {};
     for (const name of [
       "resolution", "time", "symmetry", "zoom", "iterations", "complexity",
-      "bloom", "palette", "mode", "petals", "pan", "rot",
+      "bloom", "palette", "mode", "petals", "pan", "rot", "hue", "sat",
     ]) {
       U[name] = gl.getUniformLocation(prog, "u_" + name);
     }
@@ -148,6 +148,45 @@
   const MODE_ITER_MAX = { 0: 16, 1: 10, 2: 7, 3: 12, 4: 8, 5: 8, 6: 6, 7: 6, 8: 8, 9: 8 };
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const r3 = n => Math.round(n * 1000) / 1000;
+
+  // How each slider's number relates to its track. `log` means the track is
+  // exponential between those two values: a linear field-of-view track spends
+  // nine tenths of its length above 1.0, which is exactly where the modes with
+  // fine structure are not — and no amount of dragging reaches 0.4 there.
+  // `int` and `dec` only decide how the readout is written.
+  const SLIDERS = {
+    symmetry:   { int: true },
+    petals:     { int: true },
+    zoom:       { log: [ZOOM_MIN, ZOOM_MAX], dec: 2 },
+    iterations: { int: true },
+    complexity: { dec: 2 },
+    speed:      { dec: 2 },
+    time:       { dec: 2 },
+    hue:        { int: true },
+    sat:        { dec: 2 },
+    bloom:      { dec: 2 },
+  };
+  const SLIDER_IDS = Object.keys(SLIDERS);
+
+  // Value → track position and back. Only the exponential sliders do anything
+  // here; for every other one the track units are the value.
+  function toSlider(id, v) {
+    const spec = SLIDERS[id];
+    const el = document.getElementById(id);
+    if (!spec || !spec.log || !el) return v;
+    const [lo, hi] = spec.log;
+    const t = Math.log(clamp(parseFloat(v), lo, hi) / lo) / Math.log(hi / lo);
+    return Math.round(+el.min + t * (+el.max - +el.min));
+  }
+  function fromSlider(id, u) {
+    const spec = SLIDERS[id];
+    const el = document.getElementById(id);
+    if (!spec || !spec.log || !el) return parseFloat(u);
+    const [lo, hi] = spec.log;
+    const t = (parseFloat(u) - +el.min) / (+el.max - +el.min);
+    return r3(lo * Math.pow(hi / lo, t));
+  }
 
   // What each mode does with the sliders. The uniforms are shared but their
   // meaning is not: `petals` is a petal count in Floral, the seed of the whole
@@ -163,20 +202,30 @@
   //
   // `upright` marks the modes that have an up (their preset parks the clock, see
   // applyMode): Random must not set them spinning through main()'s u_time turn.
+  //
+  // `zones` is the band tuning.js paints on a track: where that mode is worth
+  // looking. They are read off the presets and the notes in CLAUDE.md, not
+  // measured, and they are a hint only — min and max stay the same for every
+  // mode, because narrowing them would clamp a permalink arriving from another.
   const MODE_UI = {
-    0: { inert: ["petals"] },
-    1: {},
-    2: { inert: ["petals"] },
-    3: { inert: ["petals"] },
-    4: { inert: ["petals"] },
-    5: { names: { petals: "Lobi della rosetta", iterations: "Anelli per tessera" } },
-    6: { names: { petals: "Punte della stella", iterations: "Corsi" } },
-    7: { upright: true, names: { petals: "Lobi dei fiori" } },
-    8: { upright: true, names: {
+    0: { inert: ["petals"], zones: { zoom: [0.3, 1.0] } },
+    1: { zones: { zoom: [1.4, 2.8], symmetry: [6, 14] } },
+    2: { inert: ["petals"], zones: { zoom: [0.3, 1.0], symmetry: [8, 12] } },
+    3: { inert: ["petals"], zones: { zoom: [0.3, 1.0] } },
+    4: { inert: ["petals"], zones: { zoom: [0.6, 1.4], symmetry: [10, 16] } },
+    5: { zones: { zoom: [1.2, 2.8], symmetry: [12, 18] },
+         names: { petals: "Lobi della rosetta", iterations: "Anelli per tessera" } },
+    6: { zones: { zoom: [2.2, 3.2], symmetry: [8, 16] },
+         names: { petals: "Punte della stella", iterations: "Corsi" } },
+    7: { upright: true, zones: { zoom: [1.4, 2.2] },
+         names: { petals: "Lobi dei fiori" } },
+    8: { upright: true, zones: { zoom: [2.8, 3.8], symmetry: [6, 12] },
+         names: {
            petals: "Seme del piatto", iterations: "Corone",
            complexity: "Densità del motivo", bloom: "Peso del tratto",
            speed: "Rotazione" } },
-    9: { upright: true, names: {
+    9: { upright: true, zones: { zoom: [2.4, 3.4], symmetry: [5, 8] },
+         names: {
            petals: "Lobi delle nicchie", iterations: "Gironi",
            complexity: "Densità del motivo", bloom: "Peso del tratto",
            speed: "Rotazione" } },
@@ -195,10 +244,20 @@
     bloom:      0.85,
     petals:     6,
     palette:    5,      // Isfahan Gold
+    // The clock is part of the state, not a variable beside it: it is what
+    // decides whether a mode has resolved yet, so it belongs in the permalink
+    // and in the undo stack like everything else.
+    time:       0,
+    hue:        0,      // colour trim, degrees
+    sat:        1,
     pan:        [0, 0],
     rot:        0,
     paused:     false,
   };
+
+  // The factory settings, for the double click that puts one slider back where
+  // this mode wants it: modePresets first, this as the fallback.
+  const DEFAULTS = { ...state, pan: [0, 0] };   // pan copied: state.pan is mutated in place
 
   // Per-mode sensible defaults
   const modePresets = {
@@ -258,7 +317,6 @@
       s: "m=9&s=6&p=6&i=6&z=2.9&c=1&v=0&b=0.85&g=2&x=0&y=0&r=0" },
   ];
 
-  let timeAccum = 0;
   let lastFrame = performance.now();
   let dirty     = true;
   const markDirty = () => { dirty = true; };
@@ -305,24 +363,30 @@
   let lastHash = "";
   const presetSel = $("preset");   // read here: schedulePersist runs before the picker is filled
 
+  // Callers always speak in values, never in track units: the conversion for
+  // an exponential slider happens here and nowhere else.
   function setControl(id, value) {
     const el = $(id);
     if (!el) return;
-    el.value = value;
+    el.value = SLIDERS[id] && SLIDERS[id].log ? toSlider(id, value) : value;
     // The element clamps to its own min/max/step; the listener reads el.value back.
     el.dispatchEvent(new Event(el.tagName === "SELECT" ? "change" : "input"));
   }
 
-  const bindRange = (id, key, parseFn = parseFloat) => {
+  const readouts = {};
+
+  const bindRange = (id, key) => {
     const el = $(id);
     if (!el) return;
+    const spec = SLIDERS[id] || {};
     const out = document.querySelector(`[data-out="${id}"]`);
+    readouts[id] = out;
     const update = () => {
-      state[key] = parseFn(el.value);
-      if (out) {
-        const isFloat = el.step && String(el.step).includes(".");
-        out.textContent = isFloat ? (+el.value).toFixed(2) : String(parseInt(el.value, 10));
-      }
+      const v = spec.log ? fromSlider(id, el.value)
+              : spec.int ? parseInt(el.value, 10)
+              : parseFloat(el.value);
+      state[key] = v;
+      if (out) out.textContent = spec.int ? String(v) : v.toFixed(spec.dec ?? 2);
       markDirty();
       schedulePersist();
     };
@@ -330,13 +394,7 @@
     update();
   };
 
-  bindRange("symmetry",   "symmetry",   parseInt);
-  bindRange("zoom",       "zoom");
-  bindRange("iterations", "iterations", parseInt);
-  bindRange("complexity", "complexity");
-  bindRange("speed",      "speed");
-  bindRange("bloom",      "bloom");
-  bindRange("petals",     "petals",     parseInt);
+  for (const id of SLIDER_IDS) bindRange(id, id);
 
   $("palette").addEventListener("change", e => {
     state.palette = parseInt(e.target.value, 10);
@@ -344,34 +402,67 @@
     schedulePersist();
   });
 
+  // The clock is a control now, so the panel has to follow it while it runs —
+  // but through the DOM only. Dispatching an input event sixty times a second
+  // would rewrite the URL sixty times a second; the hash catches up on the next
+  // thing you actually do, pausing included.
+  let timeShownAt = -1e9;
+  function reflectTime(now) {
+    const el = $("time");
+    if (!el || now - timeShownAt < 100) return;
+    timeShownAt = now;
+    el.value = Math.min(state.time, +el.max);
+    // The readout shows the true clock even past the end of the track: the
+    // handle pins, the number must not lie.
+    if (readouts.time) readouts.time.textContent = state.time.toFixed(2);
+  }
+  function setTime(v) {
+    state.time = v;
+    timeShownAt = -1e9;
+    reflectTime(performance.now());
+    markDirty();
+  }
+
   // ---------- Adaptive panel ----------
   // The names come from the markup, so the table above only has to list the
   // modes that rename something; everything else falls back to the default.
-  const SLIDER_IDS = ["symmetry", "petals", "zoom", "iterations", "complexity", "speed", "bloom"];
-  const INERT_TIP  = "Questa modalità non legge questo parametro.";
+  const INERT_TIP = "Questa modalità non legge questo parametro.";
 
   const sliders = SLIDER_IDS.map(id => {
     const el = $(id);
     if (!el) return null;
-    const label = el.closest("label");
-    const name  = label && label.querySelector(".name");
-    return { id, el, label, name, base: name ? name.textContent : "" };
+    const ctl  = el.closest(".ctl");
+    const name = ctl && ctl.querySelector(".name");
+    return { id, el, ctl, name, base: name ? name.textContent : "" };
   }).filter(Boolean);
 
   function syncPanel(mode) {
     const ui = MODE_UI[mode] || {};
     for (const s of sliders) {
       const inert = isInert(mode, s.id);
-      if (s.name) s.name.textContent = ui.names?.[s.id] || s.base;
-      if (s.label) {
-        s.label.classList.toggle("inert", inert);
-        s.label.title = inert ? INERT_TIP : "";
+      if (s.name) {
+        s.name.textContent = ui.names?.[s.id] || s.base;
+        s.name.title = inert ? INERT_TIP : "";
       }
+      if (s.ctl) s.ctl.classList.toggle("inert", inert);
       // Disabled only blocks the pointer: setControl still reaches it, so a
       // permalink carrying a value for an inert slider restores intact.
       s.el.disabled = inert;
     }
+    tuning.applyZones(mode);
   }
+
+  // ---------- Tuning workbench ----------
+  // History, A/B, padlocks, Varia, saved views, typeable readouts and the zone
+  // bands live in tuning.js. It is UI only, so a missing file must not take the
+  // visualiser down with it: the stub keeps every call site honest.
+  const tuning = window.FRACTAL_TUNING
+    ? window.FRACTAL_TUNING.create({
+        $, state, DEFAULTS, SLIDER_IDS, MODE_UI, modePresets,
+        setControl, serialize, deserialize, applyState, persist,
+        showNotice, isInert, toSlider,
+      })
+    : { record() {}, isLocked: () => false, applyZones() {}, mountViews() {}, loadView: () => false };
 
   // Applies a mode: adjusts the iteration range it can actually use, relabels
   // the panel, and (on user interaction only) its preset + a fresh framing.
@@ -393,7 +484,7 @@
       // A preset asking for speed 0 wants a still plate, and the clock keeps
       // turning the scene through main()'s u_time rotation: rewind it, or the
       // upright modes arrive tilted by however long the last one ran.
-      if (preset && preset.speed === 0) timeAccum = 0;
+      if (preset && preset.speed === 0) setTime(0);
       state.pan[0] = 0;
       state.pan[1] = 0;
       state.rot = 0;
@@ -411,33 +502,41 @@
   $("pause").addEventListener("click", () => {
     state.paused = !state.paused;
     $("pause").textContent = state.paused ? "Play" : "Pausa";
+    // Pausing is how you say "this frame": write it to the URL, clock included.
+    schedulePersist();
   });
 
   // Random draws inside what the current mode can use, not inside one range for
   // all ten: a field of view that frames the floral garden loses the henna plate
   // off the edges, an iteration count above the mode's loop bound is dead travel,
-  // and a spin on an upright mode just tilts it.
+  // and a spin on an upright mode just tilts it. A padlocked control is left
+  // exactly where it is — that is the whole promise of the padlock.
   $("randomize").addEventListener("click", () => {
     const mode = state.mode;
     const ui   = MODE_UI[mode] || {};
     const rnd  = (a, b) => a + Math.random() * (b - a);
+    const free = id => !isInert(mode, id) && !tuning.isLocked(id);
 
-    setControl("symmetry",   Math.floor(rnd(4, 16)));
-    setControl("complexity", rnd(0.7, 1.6).toFixed(2));
-    setControl("iterations", Math.floor(rnd(3, (MODE_ITER_MAX[mode] ?? 12) + 1)));
-    // Around the framing the mode was tuned for: the presets already know
-    // whether this mode wants a wide field or a deep zoom.
-    const zBase = modePresets[mode]?.zoom ?? state.zoom;
-    setControl("zoom",       clamp(zBase * rnd(0.7, 1.35), ZOOM_MIN, ZOOM_MAX).toFixed(2));
-    setControl("bloom",      rnd(0.4, 1.3).toFixed(2));
-    if (!isInert(mode, "petals")) setControl("petals", Math.floor(rnd(3, 12)));
-    setControl("palette",    Math.floor(Math.random() * $("palette").options.length));
+    if (free("symmetry"))   setControl("symmetry",   Math.floor(rnd(4, 16)));
+    if (free("complexity")) setControl("complexity", rnd(0.7, 1.6).toFixed(2));
+    if (free("iterations")) setControl("iterations", Math.floor(rnd(3, (MODE_ITER_MAX[mode] ?? 12) + 1)));
+    if (free("zoom")) {
+      // Around the framing the mode was tuned for: the presets already know
+      // whether this mode wants a wide field or a deep zoom.
+      const zBase = modePresets[mode]?.zoom ?? state.zoom;
+      setControl("zoom", clamp(zBase * rnd(0.7, 1.35), ZOOM_MIN, ZOOM_MAX).toFixed(2));
+    }
+    if (free("bloom"))   setControl("bloom",   rnd(0.4, 1.3).toFixed(2));
+    if (free("petals"))  setControl("petals",  Math.floor(rnd(3, 12)));
+    if (free("palette")) setControl("palette", Math.floor(Math.random() * $("palette").options.length));
 
-    if (ui.upright) {
-      setControl("speed", 0);
-      timeAccum = 0;              // as in applyMode: a still plate must start level
-    } else {
-      setControl("speed", rnd(0.1, 0.8).toFixed(2));
+    if (free("speed")) {
+      if (ui.upright) {
+        setControl("speed", 0);
+        setTime(0);               // as in applyMode: a still plate must start level
+      } else {
+        setControl("speed", rnd(0.1, 0.8).toFixed(2));
+      }
     }
   });
 
@@ -489,15 +588,20 @@
   const HASH_MAP = {
     s: "symmetry", p: "petals", i: "iterations", z: "zoom",
     c: "complexity", v: "speed", b: "bloom", g: "palette",
+    t: "time", h: "hue", k: "sat",
   };
 
-  const r3 = n => Math.round(n * 1000) / 1000;
+  // Defaults for the keys added after the first permalinks were shared. A hash
+  // without them must render the way it did when it was written, so applyState
+  // puts these back instead of leaving whatever the previous view had.
+  const HASH_LATE = { t: 0, h: 0, k: 1 };
 
   function serialize() {
     const s = state;
     return `m=${s.mode}&s=${s.symmetry}&p=${s.petals}&i=${s.iterations}` +
            `&z=${r3(s.zoom)}&c=${r3(s.complexity)}&v=${r3(s.speed)}&b=${r3(s.bloom)}` +
-           `&g=${s.palette}&x=${r3(s.pan[0])}&y=${r3(s.pan[1])}&r=${r3(s.rot)}`;
+           `&g=${s.palette}&t=${r3(s.time)}&h=${s.hue}&k=${r3(s.sat)}` +
+           `&x=${r3(s.pan[0])}&y=${r3(s.pan[1])}&r=${r3(s.rot)}`;
   }
 
   function deserialize(str) {
@@ -516,6 +620,7 @@
     if ("m" in o) applyMode(clamp(Math.round(o.m), 0, 9), false);
     for (const key in HASH_MAP) {
       if (key in o) setControl(HASH_MAP[key], o[key]);
+      else if (key in HASH_LATE) setControl(HASH_MAP[key], HASH_LATE[key]);
     }
     if ("x" in o) state.pan[0] = o.x;
     if ("y" in o) state.pan[1] = o.y;
@@ -536,8 +641,12 @@
     persistTimer = setTimeout(persist, 250);
   }
 
-  function persist() {
+  // `record: false` is for the history walking itself back: undo installs a
+  // state that is already on the stack, and re-recording it would make Ctrl+Z
+  // a fixed point you can never leave.
+  function persist(opts) {
     lastHash = serialize();
+    if (!opts || opts.record !== false) tuning.record(lastHash);
     try {
       history.replaceState(null, "", "#" + lastHash);
     } catch {
@@ -555,6 +664,11 @@
     if (h && h !== lastHash) {
       lastHash = h;
       applyState(deserialize(h));
+      // A pasted URL is a change of view like any other: persist normalises the
+      // hash (an old one gains the keys it lacks) and puts the state you were
+      // looking at on the undo stack, so Ctrl+Z brings it back. The write it
+      // makes matches lastHash, so the hashchange it triggers stops right here.
+      persist();
     }
   });
 
@@ -578,12 +692,18 @@
       opt.textContent = p.name;
       presetSel.appendChild(opt);
     });
+    tuning.mountViews(presetSel);
     presetSel.addEventListener("change", e => {
-      const p = NAMED_PRESETS[parseInt(e.target.value, 10)];
+      const value = e.target.value;
+      if (tuning.loadView(value)) return;    // one of the user's own views
+      const p = NAMED_PRESETS[parseInt(value, 10)];
       if (!p) return;
       applyState(deserialize(p.s));
-      timeAccum = p.t || 0;
-      markDirty();
+      // The preset's own clock wins over the one the hash string carries: a
+      // named preset is a picture, and `t` is which second of it. setTime, not
+      // setControl, because a dispatched input would clear the picker on the
+      // spot through schedulePersist.
+      setTime(p.t || 0);
       persist();
     });
   }
@@ -699,7 +819,7 @@
   function render() {
     if (!ready || !dirty) return false;
     gl.uniform2f(U.resolution, canvas.width, canvas.height);
-    gl.uniform1f(U.time,       timeAccum);
+    gl.uniform1f(U.time,       state.time);
     gl.uniform1f(U.symmetry,   state.symmetry);
     gl.uniform1f(U.zoom,       state.zoom);
     gl.uniform1f(U.iterations, state.iterations);
@@ -710,6 +830,8 @@
     gl.uniform1f(U.petals,     state.petals);
     gl.uniform2f(U.pan,        state.pan[0], state.pan[1]);
     gl.uniform1f(U.rot,        state.rot);
+    gl.uniform1f(U.hue,        state.hue * Math.PI / 180);
+    gl.uniform1f(U.sat,        state.sat);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     dirty = false;
     return true;
@@ -750,7 +872,8 @@
     // would redraw an identical frame 60 times a second (modes 7-9 live there).
     const animating = !state.paused && state.speed !== 0;
     if (animating) {
-      timeAccum += dtMs * 0.001 * state.speed;
+      state.time += dtMs * 0.001 * state.speed;
+      reflectTime(now);
       dirty = true;
     }
 

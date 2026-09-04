@@ -17,16 +17,24 @@
     <button id="toggle" title="Mostra/Nascondi pannello">&#9776;</button>
   </header>
 
+  <!-- Every control is a `.ctl` wrapper holding a `.head` (name, readout,
+       padlock) and the input itself. The name is a <label for> instead of a
+       wrapping <label> so that the padlock and the editable readout beside it
+       are not swallowed by the label's activation behaviour. `syncPanel()` in
+       main.js rewrites `.name` per mode; `tuning.js` owns the padlocks. -->
   <div id="controls">
-    <label class="wide">Preset
+    <div class="ctl wide">
+      <div class="head"><label class="name" for="preset">Preset</label></div>
       <!-- The named views are filled in by main.js: they are permalinks, and
-           keeping them next to the state code stops the two from drifting. -->
+           keeping them next to the state code stops the two from drifting.
+           tuning.js appends the user's own saved views under them. -->
       <select id="preset">
         <option value="">— scegli una vista —</option>
       </select>
-    </label>
+    </div>
 
-    <label class="wide">Modalità
+    <div class="ctl wide">
+      <div class="head"><label class="name" for="mode">Modalità</label></div>
       <select id="mode">
         <option value="0">Kaleido IFS</option>
         <option value="1" selected>Giardino Floreale (islimi)</option>
@@ -39,36 +47,78 @@
         <option value="8">Henna (mandala piatto)</option>
         <option value="9">Muqarnas (volta a stalattiti)</option>
       </select>
-    </label>
+    </div>
 
-    <!-- The name of every slider lives in its own <span class="name">: the mode
-         rewrites it (see MODE_UI in main.js), so it cannot be a bare text node
-         next to the readout. -->
-    <label><span class="name">Simmetria</span> <span data-out="symmetry">8</span>
+    <div class="ctl">
+      <div class="head">
+        <label class="name" for="symmetry">Simmetria</label>
+        <span data-out="symmetry">8</span>
+        <button type="button" class="lock" data-lock="symmetry">&#128275;</button>
+      </div>
       <input type="range" id="symmetry" min="3" max="24" step="1" value="8" />
-    </label>
+    </div>
 
-    <label><span class="name">Petali</span> <span data-out="petals">6</span>
+    <div class="ctl">
+      <div class="head">
+        <label class="name" for="petals">Petali</label>
+        <span data-out="petals">6</span>
+        <button type="button" class="lock" data-lock="petals">&#128275;</button>
+      </div>
       <input type="range" id="petals" min="3" max="16" step="1" value="6" />
-    </label>
+    </div>
 
-    <label><span class="name">Campo visivo</span> <span data-out="zoom">1.6</span>
-      <input type="range" id="zoom" min="0.2" max="8" step="0.01" value="1.6" />
-    </label>
+    <!-- The field of view is the one slider whose track is exponential: see
+         SLIDERS in main.js. min/max here are track units, not zoom values. -->
+    <div class="ctl">
+      <div class="head">
+        <label class="name" for="zoom">Campo visivo</label>
+        <span data-out="zoom">1.60</span>
+        <button type="button" class="lock" data-lock="zoom">&#128275;</button>
+      </div>
+      <input type="range" id="zoom" min="0" max="2000" step="1" value="1127" />
+    </div>
 
-    <label><span class="name">Iterazioni</span> <span data-out="iterations">7</span>
+    <div class="ctl">
+      <div class="head">
+        <label class="name" for="iterations">Iterazioni</label>
+        <span data-out="iterations">7</span>
+        <button type="button" class="lock" data-lock="iterations">&#128275;</button>
+      </div>
       <input type="range" id="iterations" min="1" max="14" step="1" value="7" />
-    </label>
+    </div>
 
-    <label><span class="name">Complessità</span> <span data-out="complexity">1.10</span>
+    <div class="ctl">
+      <div class="head">
+        <label class="name" for="complexity">Complessità</label>
+        <span data-out="complexity">1.10</span>
+        <button type="button" class="lock" data-lock="complexity">&#128275;</button>
+      </div>
       <input type="range" id="complexity" min="0.50" max="1.80" step="0.01" value="1.10" />
-    </label>
+    </div>
 
-    <label><span class="name">Velocità</span> <span data-out="speed">0.35</span>
+    <div class="ctl">
+      <div class="head">
+        <label class="name" for="speed">Velocità</label>
+        <span data-out="speed">0.35</span>
+        <button type="button" class="lock" data-lock="speed">&#128275;</button>
+      </div>
       <input type="range" id="speed" min="0" max="2" step="0.01" value="0.35" />
-    </label>
+    </div>
 
-    <label class="wide">Palette
+    <div class="ctl">
+      <div class="head">
+        <label class="name" for="time">Tempo</label>
+        <span data-out="time">0.00</span>
+        <button type="button" class="lock" data-lock="time">&#128275;</button>
+      </div>
+      <input type="range" id="time" min="0" max="300" step="0.05" value="0" />
+    </div>
+
+    <div class="ctl wide">
+      <div class="head">
+        <label class="name" for="palette">Palette</label>
+        <button type="button" class="lock" data-lock="palette">&#128275;</button>
+      </div>
       <select id="palette">
         <option value="0">Persian Blue</option>
         <option value="1">Azulejo</option>
@@ -79,28 +129,63 @@
         <option value="6">Lapis Lazuli</option>
         <option value="7">Emerald Garden</option>
       </select>
-    </label>
+    </div>
 
-    <label><span class="name">Bloom</span> <span data-out="bloom">0.85</span>
+    <div class="ctl">
+      <div class="head">
+        <label class="name" for="hue">Tinta</label>
+        <span data-out="hue">0</span>
+        <button type="button" class="lock" data-lock="hue">&#128275;</button>
+      </div>
+      <input type="range" id="hue" min="-180" max="180" step="1" value="0" />
+    </div>
+
+    <div class="ctl">
+      <div class="head">
+        <label class="name" for="sat">Saturazione</label>
+        <span data-out="sat">1.00</span>
+        <button type="button" class="lock" data-lock="sat">&#128275;</button>
+      </div>
+      <input type="range" id="sat" min="0" max="2" step="0.01" value="1" />
+    </div>
+
+    <div class="ctl">
+      <div class="head">
+        <label class="name" for="bloom">Bloom</label>
+        <span data-out="bloom">0.85</span>
+        <button type="button" class="lock" data-lock="bloom">&#128275;</button>
+      </div>
       <input type="range" id="bloom" min="0" max="2" step="0.01" value="0.85" />
-    </label>
+    </div>
 
     <div class="row">
       <button id="pause">Pausa</button>
       <button id="randomize">Random</button>
+      <button id="vary" title="Varia: sposta di poco i parametri non bloccati (V)">Varia</button>
       <button id="screenshot">PNG</button>
       <button id="reset" title="Rimetti al centro">Centra</button>
+    </div>
+
+    <div class="row mini">
+      <button id="undo" title="Annulla (Ctrl+Z)">&#8630;</button>
+      <button id="redo" title="Rifai (Ctrl+Maiusc+Z)">&#8631;</button>
+      <button id="ab" title="Parcheggia questa vista, poi alterna fra le due (B)">A/B</button>
+      <button id="saveview" title="Salva questa vista nel menu Preset · Maiusc+click: elimina quella selezionata">&#9733;</button>
     </div>
 
     <p class="hint">
       Trascina per spostare · Shift+trascina per ruotare · Scroll o pinch per lo zoom ·
       Doppio click = fullscreen<br />
-      L'indirizzo nella barra contiene la vista corrente: copialo per condividerla.
+      Doppio click su uno slider = valore della modalità · scrivi nel numero per
+      digitarlo · il lucchetto lo protegge da Random e Varia.<br />
+      L'indirizzo nella barra contiene la vista corrente, tempo compreso:
+      copialo per condividerla.
     </p>
   </div>
 </div>
 
 <script src="shader.js"></script>
+<script src="tuning.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

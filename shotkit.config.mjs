@@ -10,7 +10,9 @@
  *   SwiftShader the heavier modes cost seconds per frame.
  * - Every state is reachable from the URL hash; main.js `restore()` reads it on
  *   load. Keys: m=mode s=symmetry p=petals i=iterations z=field-of-view
- *   c=complexity v=speed b=bloom g=palette x/y=pan r=rotation.
+ *   c=complexity v=speed b=bloom g=palette t=clock h=hue k=saturation
+ *   x/y=pan r=rotation. A hash that omits t, h or k gets 0, 0 and 1 — so the
+ *   shots below, written before those keys existed, still frame what they say.
  * - In mode 8 `p` is not a petal count but the plate's seed: it decides band
  *   widths, cell counts, motifs and fills. Change it and the whole composition
  *   changes, so a Henna shot is only reproducible with its p pinned. In mode 9
@@ -23,9 +25,11 @@
  * - **u_time matters more than any slider.** At t=0 (speed 0) modes 0, 2, 3 and
  *   4 render as a near-flat wash — they only resolve once the animation has run
  *   a few seconds. So every shot sets a speed `v` and each `prepare` RELOADS the
- *   page: a hash-only navigation does not reload, so without it `timeAccum`
- *   would carry over from the previous shot and nothing would be reproducible.
- *   With the reload, t ≈ (settleMs/1000 + ~0.3) * v, i.e. ≈6.5 at v=2.
+ *   page: a hash-only navigation does not reload, and the clock would otherwise
+ *   carry over from the previous shot. With the reload, t ≈ (settleMs/1000 +
+ *   ~0.3) * v, i.e. ≈6.5 at v=2. Since the clock became the hash key `t`, a
+ *   shot can also pin the instant outright — set t and v=0 — which is steadier
+ *   than timing it, but the shots below still use the settle-time recipe.
  * - The panel is toggled with `#toggle`; the page is reused across shots, so
  *   each shot must state which panel state it wants rather than assume.
  * - Modes 6 (Volta a Spicchi) and 7 (Mihrab) were rewritten on bounded frames
@@ -94,7 +98,7 @@ export default {
       path: hash({ m: 1, s: 12, p: 6, i: 7, z: 2.8, c: 1.1, v: 2, b: 1, g: 7, x: -0.12, y: 0, r: 0 }),
       waitFor: '#gl',
       prepare: fresh(false),
-      shows: 'the app as it opens: Giardino Floreale (islimi) at twelve-fold symmetry in the Emerald Garden palette, with the full control panel — mode, symmetry, petals, field of view, iterations, complexity, speed, palette, bloom, and the Pausa / Random / PNG / Centra row',
+      shows: 'the app as it opens: Giardino Floreale (islimi) at twelve-fold symmetry in the Emerald Garden palette, with the full control panel — mode, symmetry, petals, field of view, iterations, complexity, speed, time, palette, hue, saturation, bloom, each with its padlock, then the Pausa / Random / Varia / PNG / Centra row and the undo / redo / A-B / save row under it',
       alt: 'A twelve-fold green and gold arabesque mandala on deep blue, with a dark control panel of sliders on the right'
     },
     {
