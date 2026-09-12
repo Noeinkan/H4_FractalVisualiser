@@ -4,7 +4,7 @@ Visualizzatore WebGL di mandala ispirati alla geometria islamica: dieci
 modalità di rendering, otto palette, simmetria e iterazioni regolabili dal vivo,
 e un permalink nell'URL che descrive per intero la vista che stai guardando.
 
-Live: <https://fractal.77.42.70.26.nip.io>
+Live: <https://fractal.demos.noeinsolutions.com>
 
 ![Giardino Floreale a dodici lati, con il pannello dei controlli aperto](screenshots/hero-floral-garden.png)
 
