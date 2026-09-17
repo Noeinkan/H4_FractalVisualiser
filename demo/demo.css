@@ -1,0 +1,64 @@
+/* Demo bar: only on /demo, where the server injects this file. It borrows the
+   tokens of style.css so it reads as part of the same panel family. */
+#demo-bar {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  /* clear of #panel: 260px wide at right 16px, plus a gap */
+  max-width: calc(100vw - 260px - 64px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 8px 6px 12px;
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text);
+  z-index: 15;
+}
+
+#demo-bar .demo-text { color: var(--muted); }
+
+#demo-bar .demo-clock {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  min-width: 3.2em;
+  text-align: right;
+}
+/* The last five minutes: warm, so the end is not a surprise. */
+#demo-bar.low .demo-clock { color: #ffb86b; }
+
+#demo-bar button { padding: 3px 9px; }
+#demo-bar .demo-link { color: var(--accent); text-decoration: none; }
+#demo-bar .demo-link:hover { text-decoration: underline; }
+#demo-bar .demo-close {
+  padding: 1px 7px;
+  font-size: 15px;
+  line-height: 1;
+  background: transparent;
+  border-color: transparent;
+}
+
+/* Reduced: only the clock, which stays for the whole session. A click on it
+   brings the bar back. */
+#demo-bar.min { padding: 6px 10px; gap: 0; }
+#demo-bar.min > :not(.demo-clock) { display: none; }
+#demo-bar.min .demo-clock { cursor: pointer; min-width: 0; }
+
+/* Same breakpoint as style.css and main.js: the panel becomes a bottom sheet,
+   so the bar takes the top edge. */
+@media (max-width: 620px) {
+  #demo-bar {
+    top: max(12px, env(safe-area-inset-top));
+    left: 12px;
+    right: auto;
+    max-width: calc(100vw - 24px);
+  }
+}

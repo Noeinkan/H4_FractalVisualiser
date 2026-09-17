@@ -13,6 +13,45 @@
     void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
   `;
 
+  // The ink palettes and the colour trim are spliced into FRAG_BODY below and
+  // exported on their own: brush.js draws mode 10's strokes with a program of
+  // its own, and they must take the same colours as the paper this one paints.
+  const INK = `
+    struct Ink { vec3 line; vec3 paper; vec3 c1; vec3 c2; vec3 c3; };
+
+    // Same slots as pickPalette, flattened: each gradient becomes an ink +
+    // paper + three flat fills. 0 and 5 are the two reference plates; 8 is the
+    // night plate the brush was tuned on, a white veil and violet on black.
+    Ink inkPalette(float idx) {
+      if      (idx < 0.5) return Ink(vec3(0.17,0.29,0.46), vec3(0.94,0.95,0.94), vec3(0.95,0.53,0.37), vec3(0.66,0.73,0.69), vec3(0.11,0.53,0.55));
+      else if (idx < 1.5) return Ink(vec3(0.12,0.31,0.55), vec3(0.96,0.96,0.94), vec3(0.29,0.53,0.78), vec3(0.81,0.88,0.93), vec3(0.94,0.76,0.29));
+      else if (idx < 2.5) return Ink(vec3(0.79,0.64,0.15), vec3(0.07,0.14,0.36), vec3(0.11,0.25,0.56), vec3(0.91,0.84,0.54), vec3(0.18,0.44,0.71));
+      else if (idx < 3.5) return Ink(vec3(0.04,0.23,0.27), vec3(0.92,0.96,0.95), vec3(0.16,0.66,0.66), vec3(0.50,0.82,0.78), vec3(0.95,0.65,0.35));
+      else if (idx < 4.5) return Ink(vec3(0.10,0.10,0.10), vec3(0.98,0.98,0.98), vec3(0.85,0.85,0.85), vec3(0.67,0.67,0.67), vec3(0.43,0.43,0.43));
+      else if (idx < 5.5) return Ink(vec3(0.95,0.79,0.30), vec3(0.99,0.99,0.97), vec3(0.91,0.25,0.16), vec3(0.24,0.44,0.49), vec3(0.66,0.81,0.88));
+      else if (idx < 6.5) return Ink(vec3(0.09,0.19,0.48), vec3(0.95,0.96,0.98), vec3(0.18,0.44,0.82), vec3(0.50,0.70,0.91), vec3(0.88,0.77,0.42));
+      else if (idx < 7.5) return Ink(vec3(0.08,0.27,0.18), vec3(0.95,0.97,0.94), vec3(0.18,0.56,0.36), vec3(0.62,0.82,0.66), vec3(0.85,0.66,0.24));
+      else                return Ink(vec3(0.94,0.94,0.97), vec3(0.01,0.01,0.02), vec3(0.62,0.38,0.86), vec3(0.36,0.34,0.42), vec3(0.80,0.70,0.96));
+    }
+  `;
+
+  // Colour trim: hue rotated about the grey axis (Rodrigues, so it costs a cos
+  // and a cross product instead of an RGB→HSV round trip) and saturation scaled
+  // around luminance. It runs last in main(), for the same reason the tonemap
+  // does: a mode must not carry its own idea of the palette. In the flat-ink
+  // modes it moves the paper too, which is the point — the same plate on warm
+  // or on cold paper is two posters. It is linear, so brush.js trimming each
+  // stroke gives the same result as trimming the finished picture would.
+  const TRIM = `
+    vec3 trim(vec3 c, float a, float s) {
+      c = mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, s);
+      if (a == 0.0) return c;
+      vec3 k = vec3(0.57735027);
+      float ca = cos(a), sa = sin(a);
+      return c * ca + cross(k, c) * sa + k * dot(k, c) * (1.0 - ca);
+    }
+  `;
+
   const FRAG_BODY = `
     precision highp float;
 
@@ -151,9 +190,12 @@
       } else if (idx < 6.5) {
         // Lapis Lazuli: blu oltremare + turchese + bianco
         return pal(t, vec3(0.10,0.15,0.45), vec3(0.35,0.45,0.55), vec3(1.0), vec3(0.40,0.55,0.65));
-      } else {
+      } else if (idx < 7.5) {
         // Emerald Garden: verdi smeraldo + oro
         return pal(t, vec3(0.05,0.25,0.20), vec3(0.45,0.55,0.35), vec3(1.0), vec3(0.30,0.20,0.60));
+      } else {
+        // Violet Night: nero, bianco velato, viola
+        return pal(t, vec3(0.08,0.06,0.12), vec3(0.50,0.42,0.62), vec3(1.0), vec3(0.62,0.72,0.82));
       }
     }
 
@@ -648,20 +690,7 @@
     //  for them -- x/(1+1.2x) would turn white paper into 0.45 grey -- so the
     //  colours below are already display values, not linear radiance.
     // =================================================================
-    struct Ink { vec3 line; vec3 paper; vec3 c1; vec3 c2; vec3 c3; };
-
-    // Same eight slots as pickPalette, flattened: each gradient becomes an
-    // ink + paper + three flat fills. 0 and 5 are the two reference plates.
-    Ink inkPalette(float idx) {
-      if      (idx < 0.5) return Ink(vec3(0.17,0.29,0.46), vec3(0.94,0.95,0.94), vec3(0.95,0.53,0.37), vec3(0.66,0.73,0.69), vec3(0.11,0.53,0.55));
-      else if (idx < 1.5) return Ink(vec3(0.12,0.31,0.55), vec3(0.96,0.96,0.94), vec3(0.29,0.53,0.78), vec3(0.81,0.88,0.93), vec3(0.94,0.76,0.29));
-      else if (idx < 2.5) return Ink(vec3(0.79,0.64,0.15), vec3(0.07,0.14,0.36), vec3(0.11,0.25,0.56), vec3(0.91,0.84,0.54), vec3(0.18,0.44,0.71));
-      else if (idx < 3.5) return Ink(vec3(0.04,0.23,0.27), vec3(0.92,0.96,0.95), vec3(0.16,0.66,0.66), vec3(0.50,0.82,0.78), vec3(0.95,0.65,0.35));
-      else if (idx < 4.5) return Ink(vec3(0.10,0.10,0.10), vec3(0.98,0.98,0.98), vec3(0.85,0.85,0.85), vec3(0.67,0.67,0.67), vec3(0.43,0.43,0.43));
-      else if (idx < 5.5) return Ink(vec3(0.95,0.79,0.30), vec3(0.99,0.99,0.97), vec3(0.91,0.25,0.16), vec3(0.24,0.44,0.49), vec3(0.66,0.81,0.88));
-      else if (idx < 6.5) return Ink(vec3(0.09,0.19,0.48), vec3(0.95,0.96,0.98), vec3(0.18,0.44,0.82), vec3(0.50,0.70,0.91), vec3(0.88,0.77,0.42));
-      else                return Ink(vec3(0.08,0.27,0.18), vec3(0.95,0.97,0.94), vec3(0.18,0.56,0.36), vec3(0.62,0.82,0.66), vec3(0.85,0.66,0.24));
-    }
+    ${INK}
 
     // Flat compositing: paint covers paint. No additive light anywhere in an
     // ink mode, otherwise overlapping bands blow out to white.
@@ -1029,19 +1058,7 @@
       return col;
     }
 
-    // Colour trim: hue rotated about the grey axis (Rodrigues, so it costs a
-    // cos and a cross product instead of an RGB→HSV round trip) and saturation
-    // scaled around luminance. It lives here, next to main(), for the same
-    // reason the tonemap does: a mode must not carry its own idea of the
-    // palette. In the flat-ink modes it moves the paper too, which is the
-    // point — the same plate on warm or on cold paper is two posters.
-    vec3 trim(vec3 c, float a, float s) {
-      c = mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, s);
-      if (a == 0.0) return c;
-      vec3 k = vec3(0.57735027);
-      float ca = cos(a), sa = sin(a);
-      return c * ca + cross(k, c) * sa + k * dot(k, c) * (1.0 - ca);
-    }
+    ${TRIM}
 
     // =================================================================
     void main() {
@@ -1066,7 +1083,9 @@
       else if (u_mode < 6.5) col = modeVault  (uv, t);
       else if (u_mode < 7.5) col = modeMihrab (uv, t);
       else if (u_mode < 8.5) col = modeHenna  (uv, t);
-      else                   col = modeMuqarnas(uv, t);
+      else if (u_mode < 9.5) col = modeMuqarnas(uv, t);
+      // Mode 10 is a hand drawing, and brush.js draws it over this bare paper.
+      else                   col = inkPalette(u_palette).paper;
 
       // Light modes only. The flat-ink modes (8+) author display-ready colours:
       // the tonemap would crush white paper to 0.45 grey and the vignette would
@@ -1090,5 +1109,5 @@
     }
   `;
 
-  window.FRACTAL_SHADER = { VERT, FRAG_BODY };
+  window.FRACTAL_SHADER = { VERT, FRAG_BODY, INK, TRIM };
 })();

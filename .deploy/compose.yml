@@ -1,31 +1,43 @@
-# fractal — static site, no build step.
-# The repo checkout is bind-mounted read-only; nothing is compiled on the
-# server, so a rollback is just a git checkout of the previous commit.
+# fractal — Node server for / (password) and /demo (public, time-boxed).
+# Secrets and the kill switch come from /opt/sites/fractal/.env (0600, root,
+# never in git): DEMO_MODE and SITE_PASSWORD. See docs/DEMO.md.
 services:
   web:
-    image: nginxinc/nginx-unprivileged:1.27-alpine
+    build:
+      # Context is the site directory, not the checkout, so this Dockerfile
+      # lives outside the cloned repo and .dockerignore keeps .env and
+      # repo/.git out of the build context.
+      context: .
+      dockerfile: Dockerfile
+    image: site-fractal:${SITE_TAG:-latest}
     container_name: site-fractal-web
     # No `ports:` on purpose — the container is reachable only from the edge
-    # network, i.e. only through the Capsar nginx which terminates TLS.
+    # network, i.e. only through the Capsar nginx which terminates TLS. That is
+    # also why the server can trust X-Real-IP.
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      DEMO_DB_PATH: /data/demo.sqlite
     volumes:
-      - ./repo:/usr/share/nginx/html:ro
-      - ./site-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Sessions must outlive a deploy: a record kept in the container would
+      # hand every visitor a fresh 45 minutes after each release.
+      - demo-data:/data
     networks:
       - edge
     restart: unless-stopped
     read_only: true
     tmpfs:
       - /tmp
-      - /var/cache/nginx
-      - /var/run
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    mem_limit: 128m
+    mem_limit: 256m
     pids_limit: 128
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:8080/ || exit 1"]
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:8080/healthz || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -35,6 +47,9 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  demo-data:
 
 networks:
   edge:

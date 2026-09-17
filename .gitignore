@@ -2,6 +2,9 @@
 # deploy secrets live only on the server
 .deploy/.env
 
+# demo sessions of a local `npm start`; in production they live on a volume
+demo/data/
+
 # screenshot-kit output
 .shots/
 .shots-probe/

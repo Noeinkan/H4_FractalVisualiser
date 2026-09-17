@@ -1,7 +1,7 @@
 # Fractal Mandala Visualiser
 
-Visualizzatore WebGL di mandala ispirati alla geometria islamica: dieci
-modalità di rendering, otto palette, simmetria e iterazioni regolabili dal vivo,
+Visualizzatore WebGL di mandala ispirati alla geometria islamica: undici
+modalità di rendering, nove palette, simmetria e iterazioni regolabili dal vivo,
 e un permalink nell'URL che descrive per intero la vista che stai guardando.
 
 Live: <https://fractal.demos.noeinsolutions.com>
@@ -12,10 +12,12 @@ Live: <https://fractal.demos.noeinsolutions.com>
 
 Una singola pagina HTML che disegna un fullscreen quad e lascia tutto il lavoro
 a un fragment shader GLSL. Niente build step, niente dipendenze, niente backend:
-`index.html` più un foglio di stile e tre script. Aprirlo da `file://` funziona
-esattamente come servirlo da un web server.
+`index.html` più un foglio di stile e quattro script. Aprirlo da `file://`
+funziona esattamente come servirlo da un web server. L'unica eccezione al
+«tutto nello shader» è il Pennello, che disegna i suoi tratti con un programma
+proprio in `brush.js`.
 
-Le dieci modalità:
+Le undici modalità:
 
 | # | Modalità | Cosa disegna |
 |---|---|---|
@@ -29,6 +31,7 @@ Le dieci modalità:
 | 7 | Mihrab | nicchia ad arco acuto con lampada sospesa e reticolo di viticci islimi |
 | 8 | Henna | mandala vettoriale piatto: bande concentriche di motivi disegnati, composte dal seme «petali» |
 | 9 | Muqarnas | volta a stalattiti vista dal basso: nicchie ad arco su gironi |
+| 10 | Pennello | disegno a mano: forme stirate fra il puntatore e un punto che lo insegue, dallo sketch P_2_3_4_01 di *Generative Gestaltung* |
 
 La modalità 7 ha un alto e un basso: come le due modalità a inchiostro parte con
 velocità 0, perché la scena ruota lentamente con il tempo e la nicchia si
@@ -51,6 +54,25 @@ Nella modalità 9 lo stesso slider è un numero di lobi: quante scanalature sono
 incise nel catino di ogni nicchia, quante punte ha la rosetta di accento sulle
 celle alterne e quanti raggi la rosetta al centro della volta.
 
+La modalità 10, **Pennello**, non è un mandala: è un disegno a mano, ispirato
+allo sketch
+[P_2_3_4_01](https://github.com/generative-design/Code-Package-p5.js/tree/master/01_P/P_2_3_4_01)
+di *Generative Gestaltung*. Mentre trascini, a ogni fotogramma una piccola forma
+viene stirata fra il puntatore e un punto che lo insegue a passo fisso: più la
+mano è veloce, più la forma si allunga, e le forme si accumulano in veli. Il
+percorso del puntatore resta come un filo di perle. Un tratto, una volta
+disegnato, non si muove più.
+
+Il menu **Modulo** sceglie la forma, nell'ordine dei nove file dello sketch:
+ellisse sul tratto, ellisse piena, ellisse di lato, triangolo, triangolo pieno,
+una, cinque o nove linee, T. Le due forme piene ridipingono la carta prima del
+contorno, e una fila fitta di stampi diventa una fila di squame. Nelle altre
+modalità il menu è spento. Il disegno è salvato come percorsi del puntatore,
+quindi cambiare forma, passo o palette ridisegna anche i tratti già fatti.
+
+La palette **Violet Night** (nero, velo bianco, filo viola) è quella con cui il
+pennello è stato tarato, e il preset «Velo notturno» la usa.
+
 | | | | |
 |---|---|---|---|
 | ![Volta a Spicchi](screenshots/vault.png) | ![Mihrab](screenshots/mihrab.png) | ![Henna](screenshots/henna.png) | ![Muqarnas](screenshots/muqarnas.png) |
@@ -69,10 +91,31 @@ Interazione sul canvas:
 
 | Gesto | Effetto |
 |---|---|
-| trascina | sposta la vista (pan) |
+| trascina | sposta la vista (pan); nel Pennello disegna |
 | Shift + trascina | ruota |
 | rotella / pinch | zoom ancorato al puntatore |
-| doppio click | fullscreen |
+| doppio click | fullscreen (non nel Pennello) |
+
+### Disegnare nel Pennello
+
+1. Scegli la modalità **Pennello (disegno a mano)**, oppure il preset «Velo
+   notturno».
+2. Trascina sul canvas: ogni trascinamento è un tratto. Più veloce muovi, più
+   lunghe le forme; se ti fermi tenendo premuto, il punto che insegue ti
+   raggiunge e disegna un ventaglio.
+3. Per spostare la vista senza disegnare tieni premuto **Spazio** mentre
+   trascini, oppure usa il tasto centrale del mouse o due dita. La rotella
+   ingrandisce come sempre.
+4. **Backspace** (o il pulsante *Annulla tratto*) toglie l'ultimo tratto; **Canc**
+   (o *Cancella disegno*) cancella tutto, e Backspace subito dopo lo riporta
+   indietro. Questi pulsanti compaiono solo in questa modalità.
+5. Per tenerlo, esporta il **PNG**: anche a 8192 px il disegno viene ridisegnato
+   nitido, non ingrandito.
+
+Il disegno resta salvato in questo browser anche se chiudi la pagina, ma non
+entra nell'indirizzo: chi apre il tuo link vede le tue impostazioni del pennello
+sul *proprio* disegno. Se il browser non può salvarlo (finestra privata, spazio
+esaurito) un avviso lo dice, e resta l'export.
 
 Il pannello a destra si apre e chiude col pulsante `☰`. `PNG` esporta l'immagine
 alla dimensione scelta nel menu sopra, `Random` genera una combinazione di
@@ -80,7 +123,7 @@ parametri, `Varia` ne sposta di poco quelli che hai lasciato liberi, `Centra`
 azzera pan e rotazione. La riga sotto — `↶ ↷ A/B ★` — è il banco di
 regolazione, più giù.
 
-In cima al pannello c'è **Preset**: una dozzina di viste già composte, una per
+In cima al pannello c'è **Preset**: una quindicina di viste già composte, una per
 modalità più qualche variante. Sceglierne una installa lo stato completo —
 modalità, simmetria, palette, inquadratura — e per le modalità animate parte
 già a orologio avanzato, perché la 0, la 2, la 3 e la 4 a tempo zero rendono una
@@ -95,16 +138,23 @@ il pannello lo dice invece di lasciartelo scoprire:
 
 - **I nomi cambiano.** In Henna «Petali» diventa *Seme del piatto*, «Iterazioni»
   diventa *Corone* e «Bloom» *Peso del tratto*; in Muqarnas *Lobi delle nicchie*
-  e *Gironi*; nella Cupola *Lobi della rosetta*. Il valore e il permalink non
-  cambiano — cambia solo il nome sotto cui lo leggi.
+  e *Gironi*; nella Cupola *Lobi della rosetta*; nel Pennello «Petali» è il
+  *Passo del pennello* — di quanto avanza a ogni fotogramma il punto che
+  insegue: più è corto, più lunghe e fitte le forme —, «Iterazioni» sono i
+  *Veli* (altri punti che inseguono con passi più lunghi, ognuno col suo velo),
+  «Complessità» la *Larghezza del modulo* e «Bloom» l'*Opacità del velo*. Il
+  valore e il permalink non cambiano — cambia solo il nome sotto cui lo leggi.
 - **Gli slider che quella modalità non legge si spengono**, sbiaditi e non
-  trascinabili: «Petali» in Kaleido IFS, Girih, Julia e Shamsa. Il valore resta
+  trascinabili: «Petali» in Kaleido IFS, Girih, Julia e Shamsa; Simmetria,
+  Velocità e Tempo nel Pennello, che non ha né simmetria né animazione; il menu
+  «Modulo» ovunque tranne che nel Pennello. Il valore resta
   dov'era, e torna vivo appena passi a una modalità che lo usa, così un
   permalink ricevuto da qualcun altro non perde nulla.
 - **`Random` pesca dentro la modalità corrente**: iterazioni entro il tetto del
   suo ciclo, inquadratura attorno a quella per cui è tarata, e nessuna velocità
   sulle tre modalità che hanno un alto (Mihrab, Henna, Muqarnas) — girarle
-  significherebbe solo vederle storte.
+  significherebbe solo vederle storte. Nel Pennello cambia l'aspetto del disegno,
+  mai il disegno.
 
 ### Il banco di regolazione
 
@@ -112,7 +162,8 @@ Regolare vuol dire provare, e provare vuol dire poter tornare indietro.
 
 - **Annulla e rifai** (`↶ ↷`, oppure `Ctrl+Z` e `Ctrl+Maiusc+Z`) camminano
   sull'intera vista, tempo e colore compresi. Un trascinamento di slider è un
-  passo solo, non trecento.
+  passo solo, non trecento. I tratti del Pennello non sono nella vista: si
+  tolgono con Backspace, vedi sopra.
 - **A/B** parcheggia la vista corrente; il click dopo alterna fra quella e
   quella nuova, e così via. Due regolazioni vicine non si giudicano a memoria:
   si giudicano alternandole. Da tastiera è `B`; `Maiusc+click` riparcheggia.
@@ -135,7 +186,7 @@ Regolare vuol dire provare, e provare vuol dire poter tornare indietro.
 Due controlli nuovi in fondo alla lista: **Tempo** ferma l'animazione dove
 vuoi tu (le modalità 0, 2, 3 e 4 hanno bisogno di qualche secondo prima di
 risolvere), e **Tinta** e **Saturazione** ritoccano il colore *dopo* la palette,
-in tutte e dieci le modalità. Nelle due a inchiostro la tinta muove anche la
+in tutte e undici le modalità. In quelle a inchiostro la tinta muove anche la
 carta: lo stesso piatto su carta calda o fredda sono due poster diversi.
 
 ### Esportare un PNG
@@ -175,23 +226,24 @@ Ogni modifica riscrive l'hash dell'URL (con debounce a 250 ms) e lo salva in
 `localStorage`. Copiare la barra degli indirizzi condivide la vista esatta.
 
 ```
-#m=1&s=12&p=6&i=7&z=2.8&c=1.1&v=2&b=1&g=7&t=6&h=0&k=1&x=-0.12&y=0&r=0
+#m=1&s=12&p=6&i=7&z=2.8&c=1.1&v=2&b=1&g=7&t=6&h=0&k=1&o=0&x=-0.12&y=0&r=0
 ```
 
 | Chiave | Significato | Range |
 |---|---|---|
-| `m` | modalità | 0–9 |
+| `m` | modalità | 0–10 |
 | `s` | simmetria (ordine del caleidoscopio) | 3–24 |
 | `p` | petali; nella modalità 8 è il seme che sceglie la composizione | 3–16 |
 | `i` | iterazioni | 1–14, con un massimo per modalità |
 | `z` | campo visivo | 0.2–8 — **più alto = più largo**, più basso = zoom profondo |
 | `c` | complessità (fattore di scala per iterazione) | 0.50–1.80 |
 | `v` | velocità dell'animazione | 0–2 |
-| `b` | bloom, ovvero il peso del tratto nelle modalità 8 e 9 | 0–2 |
-| `g` | palette | 0–7 |
+| `b` | bloom, ovvero il peso del tratto nelle modalità dalla 8 in su | 0–2 |
+| `g` | palette | 0–8 |
 | `t` | l'istante dell'animazione, in secondi | 0–300 sullo slider, oltre solo dall'URL |
 | `h` | tinta, in gradi | −180–180 |
 | `k` | saturazione | 0–2 |
+| `o` | modulo del Pennello, nell'ordine del menu; le altre modalità lo ignorano. Il disegno stesso non è nell'indirizzo | 0–8 |
 | `x`, `y` | pan, in unità di schermo | — |
 | `r` | rotazione, in radianti | — |
 
@@ -201,9 +253,9 @@ piatta. L'hash si riscrive quando fai qualcosa — muovere uno slider, mettere i
 pausa — non a ogni fotogramma, quindi «metti in pausa e copia» è il modo di
 condividere l'istante esatto.
 
-Un permalink più vecchio di queste tre chiavi resta valido: `t`, `h` e `k`
-tornano ai loro valori neutri (0, 0, 1) invece di ereditare quelli della vista
-che stavi guardando, così rende come rendeva.
+Un permalink più vecchio di queste quattro chiavi resta valido: `t`, `h`, `k` e
+`o` tornano ai loro valori neutri (0, 0, 1, 0) invece di ereditare quelli della
+vista che stavi guardando, così rende come rendeva.
 
 All'avvio l'hash esplicito vince sull'ultima sessione salvata. Se `localStorage`
 non è disponibile (finestra privata, sandbox) resta l'URL come sola fonte.
@@ -214,7 +266,7 @@ Ci sono due suite, entrambe per
 [screenshot-kit](file:///C:/Personal_utilities/screenshot-kit) e da lanciare
 dalla radice del repo.
 
-La suite di lavoro, tredici inquadrature ad alta risoluzione per controllare a
+La suite di lavoro, diciassette inquadrature ad alta risoluzione per controllare a
 vista una modifica:
 
 ```bash

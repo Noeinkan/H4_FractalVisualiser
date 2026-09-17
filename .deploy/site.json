@@ -3,15 +3,15 @@
   "domain": "fractal.demos.noeinsolutions.com",
   "repo": "https://github.com/Noeinkan/H4_FractalVisualiser.git",
   "ref": "main",
-  "type": "static",
+  "type": "node",
   "buildCommand": null,
   "outputDir": ".",
   "spa": false,
   "port": 8080,
-  "healthPath": "/",
+  "healthPath": "/healthz",
   "expectStatus": 200,
-  "memLimit": "128m",
+  "memLimit": "256m",
   "maxBody": "4m",
   "readTimeout": "60s",
-  "notes": "Fractal Mandala Visualiser. Plain HTML/CSS/JS, no build step, no backend, no secrets."
+  "notes": "Fractal Mandala Visualiser. demo/server.mjs, Node built-ins only: / behind SITE_PASSWORD, /demo public and time-boxed. Sessions in SQLite on the demo-data volume. Server .env needs DEMO_MODE=true and SITE_PASSWORD. The health path is /healthz because / asks for a password."
 }

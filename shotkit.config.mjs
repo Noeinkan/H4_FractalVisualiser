@@ -11,8 +11,9 @@
  * - Every state is reachable from the URL hash; main.js `restore()` reads it on
  *   load. Keys: m=mode s=symmetry p=petals i=iterations z=field-of-view
  *   c=complexity v=speed b=bloom g=palette t=clock h=hue k=saturation
- *   x/y=pan r=rotation. A hash that omits t, h or k gets 0, 0 and 1 — so the
- *   shots below, written before those keys existed, still frame what they say.
+ *   o=brush module (mode 10 only) x/y=pan r=rotation. A hash that omits t, h,
+ *   k or o gets 0, 0, 1 and 0 — so the shots below, written before those keys
+ *   existed, still frame what they say.
  * - In mode 8 `p` is not a petal count but the plate's seed: it decides band
  *   widths, cell counts, motifs and fills. Change it and the whole composition
  *   changes, so a Henna shot is only reproducible with its p pinned. In mode 9
@@ -39,6 +40,15 @@
  *   niche solid gold, so check the top of its range rather than assuming it.
  * - Mode 7 has an up. Like the two ink modes it ships with speed 0, because
  *   main() spins the scene with u_time: give it a speed and the niche tips.
+ * - Mode 10 is a hand drawing. Its strokes are in localStorage, not in the
+ *   hash, so its shots write a seeded synthetic drawing there first
+ *   (seedDrawing below). A shot left without one shows bare paper, and a run
+ *   leaves that drawing behind in the capture browser only, never in yours.
+ * - Headless Chrome on the d3d11 GPU sometimes loses the WebGL context while
+ *   capturing a mode 10 page that holds strokes: the PNG comes out blank with
+ *   "Contesto WebGL perso" on it. Measured on an Intel iGPU, 2-3 runs in 5;
+ *   headed on the same GPU 0 in 4, SwiftShader 0 in 3, so it is the capture
+ *   path, not the app. Re-shoot that one, or pass --headed.
  * - No async loading: the first frame is up as soon as the shader links.
  */
 
@@ -59,6 +69,51 @@ export const setPanel = async (page, collapsed) => {
 export const fresh = collapsed => async page => {
   await page.reload({ waitUntil: 'load' });
   await setPanel(page, collapsed);
+};
+
+// Mode 10 draws what is in localStorage, and a shot cannot drag a mouse at a
+// human pace. So the hand is synthetic and seeded: loops that wander between
+// two clusters, radius and angular speed drifting, the way a hand circles over
+// a spot and moves on. Samples are rounded to five decimals, as brush.js does.
+const DRAWING_KEY = 'fractal-mandala-drawing-v1';
+
+const mulberry32 = seed => () => {
+  seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+  let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+};
+
+export function handDrawing(seed, strokes = 8) {
+  const r = mulberry32(seed);
+  const q5 = v => Math.round(v * 1e5) / 1e5;
+  const centres = [[-0.42, 0.12], [0.38, -0.10]];
+  const out = [];
+  for (let k = 0; k < strokes; k++) {
+    const [ax, ay] = centres[k % 2], [bx, by] = centres[(k + 1) % 2];
+    let cx = ax + (r() - 0.5) * 0.2, cy = ay + (r() - 0.5) * 0.2;
+    let ang = r() * Math.PI * 2, rad = 0.08 + r() * 0.12;
+    let w = (0.08 + r() * 0.10) * (r() < 0.5 ? -1 : 1);
+    const n = 450 + Math.floor(r() * 500);
+    const p = [];
+    for (let i = 0; i < n; i++) {
+      ang += w * (0.6 + 0.8 * Math.abs(Math.sin(i * 0.013 + k)));
+      rad = Math.min(0.26, Math.max(0.03, rad + (r() - 0.5) * 0.012));
+      const drift = i > n * 0.7 ? 0.004 : 0;       // the last stretch heads for the other cluster
+      cx += (r() - 0.5) * 0.006 + (bx - cx) * drift;
+      cy += (r() - 0.5) * 0.006 + (by - cy) * drift;
+      if (r() < 0.01) w = -w;
+      p.push(q5(cx + rad * Math.cos(ang)), q5(cy + rad * 0.85 * Math.sin(ang)));
+    }
+    out.push({ z: 1, p });
+  }
+  return JSON.stringify({ v: 1, strokes: out });
+}
+
+export const seedDrawing = json => async page => {
+  await page.evaluate(([k, v]) => localStorage.setItem(k, v), [DRAWING_KEY, json]);
+  await page.reload({ waitUntil: 'load' });
+  await setPanel(page, true);
 };
 
 // Deterministic "Random": the click handler calls Math.random(), so seeding it
@@ -227,6 +282,28 @@ export default {
       prepare: fresh(true),
       shows: 'the Petali slider in Muqarnas — the same vault as shot 10 at p=12: twelve flutes fanning across each niche head, twelve-pointed bosses on the alternating cells, and a denser crown rosette',
       alt: 'A cobalt and gold muqarnas vault whose small arched niches are each carved with a fan of fine gold ribs'
+    },
+    {
+      name: '15-brush-veil',
+      // Mode 10 is a hand drawing kept in localStorage, not in the hash: the
+      // hash only sets the look, and seedDrawing writes a synthetic hand into
+      // storage before the reload. Violet Night (g=8) is the look it was tuned on.
+      path: hash({ m: 10, s: 8, p: 4, i: 1, z: 1, c: 1, v: 0, b: 0.5, g: 8, o: 0, x: 0, y: 0, r: 0 }),
+      waitFor: '#gl',
+      prepare: seedDrawing(handDrawing(7)),
+      shows: 'Pennello — hand drawing after Generative Gestaltung P_2_3_4_01: every frame of dragging stretches an ellipse between the pointer and a point chasing it, and the ellipses pile up into white veils around the violet, beaded path of the pointer; Violet Night',
+      alt: 'Two clouds of translucent white ribbon-like veils on black, threaded with a violet dotted line'
+    },
+    {
+      name: '16-brush-scales',
+      // Same hand as shot 15, other module and paper: o=1 is the filled ellipse,
+      // which paints the paper back before its outline and so covers what came
+      // before. p=6 is a longer chase step, so the modules come out shorter.
+      path: hash({ m: 10, s: 8, p: 6, i: 2, z: 1, c: 1.4, v: 0, b: 0.9, g: 4, o: 1, x: 0, y: 0, r: 0 }),
+      waitFor: '#gl',
+      prepare: seedDrawing(handDrawing(7)),
+      shows: 'the Modulo menu and the sliders on one drawing — the same strokes as shot 15 redrawn with filled ellipses, two veils and a longer step on white paper: the drawing is kept as pointer paths, so changing the brush redraws all of it',
+      alt: 'A grey-on-white drawing of overlapping scale-like ellipses following two looping clusters'
     },
     {
       name: '08-randomize',

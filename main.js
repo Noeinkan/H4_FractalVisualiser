@@ -44,8 +44,19 @@
     return;
   }
 
+  // ---------- Hand drawing (mode 10) ----------
+  // Strokes, their storage and their GL program live in brush.js. Created
+  // before buildGL, which also rebuilds its GL side after a context loss; a
+  // missing file leaves mode 10 as bare paper and everything else intact.
+  const BRUSH_MODE = 10;
+  const brush = window.FRACTAL_BRUSH
+    ? window.FRACTAL_BRUSH.create({ gl, shader: shaderSrc, showNotice })
+    : { buildGL() {}, render() {}, begin() {}, moveTo() {}, tick: () => false, end() {},
+        undo: () => false, clear: () => false, isDrawing: () => false, count: () => 0 };
+
   // ---------- GL program (rebuildable, for context loss) ----------
   let prog = null, buf = null, U = null, ready = false, hasDerivatives = false;
+  let posLoc = 0;      // a_pos, rebound every frame since brush.js binds its own
   let maxDim = 4096;   // largest drawing buffer this GL will accept, read in buildGL
 
   function compile(type, src, label) {
@@ -101,9 +112,9 @@
       new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
       gl.STATIC_DRAW
     );
-    const loc = gl.getAttribLocation(prog, "a_pos");
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    posLoc = gl.getAttribLocation(prog, "a_pos");
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
     U = {};
     for (const name of [
@@ -118,6 +129,7 @@
     const dims = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
     maxDim = Math.min(dims ? Math.min(dims[0], dims[1]) : 4096, 16384);
 
+    brush.buildGL();     // not fatal: without it mode 10 is bare paper
     ready = true;
     if (!hasDerivatives) {
       console.warn("OES_standard_derivatives non disponibile: AA a soglia fissa.");
@@ -151,7 +163,8 @@
 
   // Highest iteration count each mode actually consumes (its shader loop bound).
   // Beyond these the slider would be inert, so the control's max follows the mode.
-  const MODE_ITER_MAX = { 0: 16, 1: 10, 2: 7, 3: 12, 4: 8, 5: 8, 6: 6, 7: 6, 8: 8, 9: 8 };
+  const MODE_ITER_MAX = { 0: 16, 1: 10, 2: 7, 3: 12, 4: 8, 5: 8, 6: 6, 7: 6, 8: 8, 9: 8, 10: 6 };
+  const MODE_LAST = 10;
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   const r3 = n => Math.round(n * 1000) / 1000;
@@ -203,8 +216,8 @@
   // This is labelling only. `state`, the hash and the presets are untouched, so
   // a permalink written under one mode still restores whole under another, and
   // an inert slider keeps its value instead of losing it. `bloom` is never
-  // listed inert: in modes 0-7 it still rides the tonemap in main(), and in 8-9
-  // it is the stroke weight.
+  // listed inert: in modes 0-7 it still rides the tonemap in main(), and from 8
+  // on it is the stroke weight.
   //
   // `upright` marks the modes that have an up (their preset parks the clock, see
   // applyMode): Random must not set them spinning through main()'s u_time turn.
@@ -235,9 +248,23 @@
            petals: "Lobi delle nicchie", iterations: "Gironi",
            complexity: "Densità del motivo", bloom: "Peso del tratto",
            speed: "Rotazione" } },
+    // A hand drawing has no symmetry and no clock: once made it stays put.
+    // `upright` keeps Random from handing it a speed.
+    10: { upright: true, inert: ["symmetry", "speed", "time"],
+          zones: { zoom: [0.5, 2.0], petals: [3, 8] },
+          names: {
+            petals: "Passo del pennello", iterations: "Veli",
+            complexity: "Larghezza del modulo", bloom: "Opacità del velo" } },
   };
 
-  const isInert = (mode, id) => (MODE_UI[mode]?.inert || []).includes(id);
+  // The other way round from `inert`: controls that only a few modes read.
+  // Listing «Modulo» as inert in ten modes out of eleven would say the same
+  // thing ten times, and forget the eleventh the day a mode is added.
+  const ONLY_IN = { module: [BRUSH_MODE] };
+
+  const isInert = (mode, id) =>
+    (ONLY_IN[id] ? !ONLY_IN[id].includes(mode) : false) ||
+    (MODE_UI[mode]?.inert || []).includes(id);
 
   // ---------- State ----------
   const state = {
@@ -256,6 +283,7 @@
     time:       0,
     hue:        0,      // colour trim, degrees
     sat:        1,
+    module:     0,      // mode 10: which brush module, the sketch's keys 1-9
     pan:        [0, 0],
     rot:        0,
     paused:     false,
@@ -282,6 +310,11 @@
     // `petals` is the seed of the composition in this mode, not a petal count.
     8: { symmetry:  8, iterations: 8,  complexity: 1.00, zoom: 3.2, palette: 0, petals: 6, speed: 0 },
     9: { symmetry:  6, iterations: 6,  complexity: 1.00, zoom: 2.9, palette: 2, petals: 6, speed: 0 },
+    // The module is left out on purpose: it is the one choice this mode is
+    // about, and coming back to the brush from another mode should not undo it.
+    // Zoom 1 makes scene units and view units the same thing, which is what a
+    // first stroke on an empty page should be drawn in.
+    10: { symmetry: 8, iterations: 1, complexity: 1.00, zoom: 1.0, palette: 8, petals: 4, speed: 0, bloom: 0.5 },
   };
 
   // Named views for the preset picker. A preset is a permalink and nothing
@@ -321,6 +354,12 @@
       s: "m=8&s=10&p=6&i=8&z=3.2&c=1.2&v=0&b=0.85&g=5&x=0&y=0&r=0" },
     { name: "Muqarnas cobalto",
       s: "m=9&s=6&p=6&i=6&z=2.9&c=1&v=0&b=0.85&g=2&x=0&y=0&r=0" },
+    // The brush presets set the look only: the drawing itself is whatever is
+    // in this browser's localStorage, and a preset never touches it.
+    { name: "Velo notturno",
+      s: "m=10&s=8&p=4&i=1&z=1&c=1&v=0&b=0.5&g=8&o=0&x=0&y=0&r=0" },
+    { name: "Squame su carta",
+      s: "m=10&s=8&p=6&i=2&z=1&c=1.4&v=0&b=0.9&g=4&o=1&x=0&y=0&r=0" },
   ];
 
   let lastFrame = performance.now();
@@ -414,6 +453,16 @@
     schedulePersist();
   });
 
+  $("module").addEventListener("change", e => {
+    // A value the menu has no option for (o=42 in a hand-edited link) leaves
+    // the select blank and its value empty: back to the first module.
+    const v = parseInt(e.target.value, 10);
+    if (!Number.isFinite(v)) e.target.value = "0";
+    state.module = Number.isFinite(v) ? v : 0;
+    markDirty();
+    schedulePersist();
+  });
+
   // The clock is a control now, so the panel has to follow it while it runs —
   // but through the DOM only. Dispatching an input event sixty times a second
   // would rewrite the URL sixty times a second; the hash catches up on the next
@@ -440,7 +489,8 @@
   // modes that rename something; everything else falls back to the default.
   const INERT_TIP = "Questa modalità non legge questo parametro.";
 
-  const sliders = SLIDER_IDS.map(id => {
+  // «Modulo» is a select, but it goes inert and back like a slider does.
+  const sliders = [...SLIDER_IDS, "module"].map(id => {
     const el = $(id);
     if (!el) return null;
     const ctl  = el.closest(".ctl");
@@ -461,6 +511,8 @@
       // permalink carrying a value for an inert slider restores intact.
       s.el.disabled = inert;
     }
+    // The drawing's own buttons and gestures only mean something in mode 10.
+    for (const el of document.querySelectorAll("[data-brush]")) el.hidden = mode !== BRUSH_MODE;
     tuning.applyZones(mode);
   }
 
@@ -541,6 +593,7 @@
     if (free("bloom"))   setControl("bloom",   rnd(0.4, 1.3).toFixed(2));
     if (free("petals"))  setControl("petals",  Math.floor(rnd(3, 12)));
     if (free("palette")) setControl("palette", Math.floor(Math.random() * $("palette").options.length));
+    if (free("module"))  setControl("module",  Math.floor(Math.random() * $("module").options.length));
 
     if (free("speed")) {
       if (ui.upright) {
@@ -563,6 +616,20 @@
   }
 
   $("screenshot").addEventListener("click", saveScreenshot);
+
+  // The drawing has its own undo, apart from ↶ ↷: those walk the permalink,
+  // and a stroke is not in the permalink.
+  function undoStroke() {
+    if (brush.undo()) markDirty();
+  }
+  function clearDrawing() {
+    if (!brush.clear()) return;
+    markDirty();
+    showNotice("Disegno cancellato. <b>Annulla tratto</b> (o Backspace) lo riporta indietro.",
+               { timeout: 4000 });
+  }
+  if ($("strokeUndo")) $("strokeUndo").addEventListener("click", undoStroke);
+  if ($("drawClear"))  $("drawClear").addEventListener("click", clearDrawing);
 
   $("toggle").addEventListener("click", () => {
     $("panel").classList.toggle("collapsed");
@@ -678,19 +745,19 @@
   const HASH_MAP = {
     s: "symmetry", p: "petals", i: "iterations", z: "zoom",
     c: "complexity", v: "speed", b: "bloom", g: "palette",
-    t: "time", h: "hue", k: "sat",
+    t: "time", h: "hue", k: "sat", o: "module",
   };
 
   // Defaults for the keys added after the first permalinks were shared. A hash
   // without them must render the way it did when it was written, so applyState
   // puts these back instead of leaving whatever the previous view had.
-  const HASH_LATE = { t: 0, h: 0, k: 1 };
+  const HASH_LATE = { t: 0, h: 0, k: 1, o: 0 };
 
   function serialize() {
     const s = state;
     return `m=${s.mode}&s=${s.symmetry}&p=${s.petals}&i=${s.iterations}` +
            `&z=${r3(s.zoom)}&c=${r3(s.complexity)}&v=${r3(s.speed)}&b=${r3(s.bloom)}` +
-           `&g=${s.palette}&t=${r3(s.time)}&h=${s.hue}&k=${r3(s.sat)}` +
+           `&g=${s.palette}&t=${r3(s.time)}&h=${s.hue}&k=${r3(s.sat)}&o=${s.module}` +
            `&x=${r3(s.pan[0])}&y=${r3(s.pan[1])}&r=${r3(s.rot)}`;
   }
 
@@ -707,7 +774,7 @@
   function applyState(o) {
     if (!o || !Object.keys(o).length) return false;
     restoring = true;
-    if ("m" in o) applyMode(clamp(Math.round(o.m), 0, 9), false);
+    if ("m" in o) applyMode(clamp(Math.round(o.m), 0, MODE_LAST), false);
     for (const key in HASH_MAP) {
       if (key in o) setControl(HASH_MAP[key], o[key]);
       else if (key in HASH_LATE) setControl(HASH_MAP[key], HASH_LATE[key]);
@@ -838,8 +905,27 @@
     markDirty();
   }
 
+  // Client pixel to scene units: the shader's uv mapping, without the clock
+  // turn main() adds. Mode 10 keeps its clock still, and a stroke has to land
+  // exactly where the pointer is.
+  function clientToScene(clientX, clientY) {
+    const [sx, sy] = clientToUV(clientX, clientY);
+    const x = (sx - state.pan[0]) * state.zoom;
+    const y = (sy - state.pan[1]) * state.zoom;
+    const c = Math.cos(state.rot), s = Math.sin(state.rot);
+    return [c * x + s * y, -s * x + c * y];
+  }
+
   const pointers = new Map();
   let pinch = null;
+  let drawingId = null;    // the pointer that is drawing in mode 10, if any
+  let spaceHeld = false;   // Space+drag pans in mode 10, as in drawing programs
+
+  function stopDrawing() {
+    if (drawingId === null) return;
+    drawingId = null;
+    brush.end();
+  }
 
   function refreshPinch() {
     const pts = [...pointers.values()];
@@ -853,7 +939,19 @@
   }
 
   canvas.addEventListener("pointerdown", e => {
+    // The middle button would start the browser's autoscroll instead of a pan.
+    if (e.button === 1) e.preventDefault();
     canvas.setPointerCapture(e.pointerId);
+    // In mode 10 a plain drag draws. The middle button, Space or Shift keep
+    // their old meaning, and a second finger turns the gesture into a pinch.
+    if (state.mode === BRUSH_MODE && e.button === 0 && !spaceHeld && !e.shiftKey &&
+        pointers.size === 0) {
+      drawingId = e.pointerId;
+      const [x, y] = clientToScene(e.clientX, e.clientY);
+      brush.begin(x, y, state.zoom);
+    } else {
+      stopDrawing();
+    }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     pinch = refreshPinch();
   });
@@ -864,6 +962,14 @@
     const dx = e.clientX - p.x, dy = e.clientY - p.y;
     p.x = e.clientX;
     p.y = e.clientY;
+
+    // Only where the pointer is: frame() stamps once per frame, as the sketch
+    // does, so a stroke does not depend on how often the mouse reports.
+    if (e.pointerId === drawingId) {
+      const [x, y] = clientToScene(e.clientX, e.clientY);
+      brush.moveTo(x, y);
+      return;
+    }
 
     if (pointers.size >= 2) {
       const next = refreshPinch();
@@ -885,9 +991,14 @@
   });
 
   const endPointer = e => {
+    if (!pointers.has(e.pointerId)) return;   // lostpointercapture follows pointerup
+    const wasDrawing = e.pointerId === drawingId;
+    if (wasDrawing) stopDrawing();
     pointers.delete(e.pointerId);
     pinch = refreshPinch();
-    if (!pointers.size) schedulePersist();
+    // A stroke changes the drawing, not the view: the permalink and the
+    // preset picker have nothing to catch up on.
+    if (!pointers.size && !wasDrawing) schedulePersist();
   };
   canvas.addEventListener("pointerup", endPointer);
   canvas.addEventListener("pointercancel", endPointer);
@@ -901,13 +1012,40 @@
   }, { passive: false });
 
   canvas.addEventListener("dblclick", () => {
+    // Two quick dabs of the brush are not a request for fullscreen.
+    if (state.mode === BRUSH_MODE) return;
     if (!document.fullscreenElement) canvas.requestFullscreen?.();
     else document.exitFullscreen?.();
   });
 
+  // Keys of the drawing: Space held pans, Backspace takes back the last
+  // stroke, Delete clears. Ignored while typing, like tuning.js's keys.
+  const typingIn = el => el && (el.isContentEditable || el.tagName === "SELECT" ||
+                                (el.tagName === "INPUT" && el.type !== "range"));
+  window.addEventListener("keydown", e => {
+    if (state.mode !== BRUSH_MODE || typingIn(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.code === "Space") {
+      spaceHeld = true;
+      e.preventDefault();          // no page scroll, no click on a focused button
+    } else if (e.key === "Backspace") {
+      e.preventDefault();
+      undoStroke();
+    } else if (e.key === "Delete") {
+      e.preventDefault();
+      clearDrawing();
+    }
+  });
+  window.addEventListener("keyup", e => { if (e.code === "Space") spaceHeld = false; });
+  window.addEventListener("blur", () => { spaceHeld = false; });
+
   // ---------- Render loop ----------
   function render() {
     if (!ready || !dirty) return false;
+    // brush.js uses programs and attributes of its own: take ours back first.
+    gl.useProgram(prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
     gl.uniform2f(U.resolution, canvas.width, canvas.height);
     gl.uniform1f(U.time,       state.time);
     gl.uniform1f(U.symmetry,   state.symmetry);
@@ -923,6 +1061,16 @@
     gl.uniform1f(U.hue,        state.hue * Math.PI / 180);
     gl.uniform1f(U.sat,        state.sat);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    if (state.mode === BRUSH_MODE) {
+      brush.render({
+        width: canvas.width, height: canvas.height,
+        pan: state.pan, zoom: state.zoom, rot: state.rot,
+        step: state.petals, veils: state.iterations, size: state.complexity,
+        module: state.module, palette: state.palette,
+        alpha: clamp(0.03 + 0.3 * state.bloom, 0, 1),
+        hue: state.hue * Math.PI / 180, sat: state.sat,
+      });
+    }
     dirty = false;
     return true;
   }
@@ -960,7 +1108,13 @@
 
     // speed 0 is a still image, not a slow animation: without this the loop
     // would redraw an identical frame 60 times a second (modes 7-9 live there).
-    const animating = !state.paused && state.speed !== 0;
+    // A mode that does not read the speed at all (the drawing) is still too,
+    // whatever a permalink from another mode left on the slider.
+    const animating = !state.paused && state.speed !== 0 && !isInert(state.mode, "speed");
+
+    // The sketch stamps once per frame while the button is down, still pointer
+    // included: that is what makes a pause in the hand draw a fan.
+    if (brush.tick()) dirty = true;
     if (animating) {
       state.time += dtMs * 0.001 * state.speed;
       reflectTime(now);

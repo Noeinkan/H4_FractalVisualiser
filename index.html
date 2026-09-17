@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<meta name="description" content="Visualizzatore di mandala frattali in WebGL: otto modalità ispirate alla geometria islamica, con palette, simmetrie e permalink condivisibile." />
+<meta name="description" content="Visualizzatore di mandala frattali in WebGL: undici modalità ispirate alla geometria islamica e alla grafica generativa, con palette, simmetrie e permalink condivisibile." />
 <title>Fractal Mandala Visualiser</title>
 <link rel="stylesheet" href="style.css" />
 </head>
@@ -46,6 +46,7 @@
         <option value="7">Mihrab (nicchia)</option>
         <option value="8">Henna (mandala piatto)</option>
         <option value="9">Muqarnas (volta a stalattiti)</option>
+        <option value="10">Pennello (disegno a mano)</option>
       </select>
     </div>
 
@@ -128,6 +129,28 @@
         <option value="5" selected>Isfahan Gold</option>
         <option value="6">Lapis Lazuli</option>
         <option value="7">Emerald Garden</option>
+        <option value="8">Violet Night</option>
+      </select>
+    </div>
+
+    <!-- Read by mode 10 only; the others leave it greyed out (ONLY_IN in
+         main.js). The order is the one of the SVG files in P_2_3_4_01, and it
+         is the hash key o: add new modules at the end. -->
+    <div class="ctl wide">
+      <div class="head">
+        <label class="name" for="module">Modulo</label>
+        <button type="button" class="lock" data-lock="module">&#128275;</button>
+      </div>
+      <select id="module">
+        <option value="0" selected>Ellisse sul tratto</option>
+        <option value="1">Ellisse piena</option>
+        <option value="2">Ellisse di lato</option>
+        <option value="3">Triangolo</option>
+        <option value="4">Triangolo pieno</option>
+        <option value="5">Una linea</option>
+        <option value="6">Cinque linee</option>
+        <option value="7">Nove linee</option>
+        <option value="8">T</option>
       </select>
     </div>
 
@@ -185,6 +208,13 @@
       <button id="reset" title="Rimetti al centro">Centra</button>
     </div>
 
+    <!-- Mode 10 only (syncPanel toggles every [data-brush]). The drawing is
+         not in the permalink, so it has its own undo beside ↶ ↷. -->
+    <div class="row" data-brush hidden>
+      <button id="strokeUndo" title="Togli l'ultimo tratto (Backspace)">Annulla tratto</button>
+      <button id="drawClear" title="Cancella tutto il disegno (Canc)">Cancella disegno</button>
+    </div>
+
     <div class="row mini">
       <button id="undo" title="Annulla (Ctrl+Z)">&#8630;</button>
       <button id="redo" title="Rifai (Ctrl+Maiusc+Z)">&#8631;</button>
@@ -200,11 +230,18 @@
       L'indirizzo nella barra contiene la vista corrente, tempo compreso:
       copialo per condividerla.
     </p>
+    <p class="hint" data-brush hidden>
+      Pennello: trascina per disegnare · Spazio+trascina, tasto centrale o due
+      dita per spostare · Backspace toglie l'ultimo tratto · Canc cancella tutto.<br />
+      Il disegno resta in questo browser, non nell'indirizzo: per condividerlo
+      esporta il PNG.
+    </p>
   </div>
 </div>
 
 <script src="shader.js"></script>
 <script src="tuning.js"></script>
+<script src="brush.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

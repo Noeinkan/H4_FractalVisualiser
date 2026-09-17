@@ -1,6 +1,6 @@
 # Fractal Mandala Visualiser
 
-Visualizzatore WebGL di mandala ispirati alla geometria islamica: dieci
+Visualizzatore WebGL di mandala ispirati alla geometria islamica: undici
 modalità di rendering GLSL, palette e simmetrie regolabili dal vivo, e un
 permalink nell'URL che descrive per intero la vista corrente.
 
@@ -10,18 +10,23 @@ Piano: [roadmap.md](roadmap.md).
 
 ## Forma del progetto
 
-Cinque file serviti così come sono. **Non c'è build step, non c'è package.json,
+Sei file serviti così come sono. **Non c'è build step, non c'è package.json,
 non ci sono dipendenze, non c'è backend.** Non introdurne senza che l'utente lo
-chieda: l'apertura da `file://` è una proprietà voluta, e sia `shader.js` sia
-`tuning.js` sono script classici (non moduli) proprio per quello.
+chieda: l'apertura da `file://` è una proprietà voluta, e `shader.js`,
+`tuning.js` e `brush.js` sono script classici (non moduli) proprio per quello.
 
 ```
 index.html   markup + pannello dei controlli
 style.css    tema scuro, pannello, slider
-shader.js    sorgenti GLSL (VERT, FRAG_BODY) su window.FRACTAL_SHADER
+shader.js    sorgenti GLSL (VERT, FRAG_BODY, INK, TRIM) su window.FRACTAL_SHADER
 tuning.js    storia, A/B, lucchetti, Varia, viste salvate su window.FRACTAL_TUNING
+brush.js     disegno a mano della modalità 10: tratti, localStorage, GL suo, su window.FRACTAL_BRUSH
 main.js      contesto GL, stato, UI, permalink, interazione, render loop
 ```
+
+`brush.js` è l'unica parte con memoria propria: vedi le note sulla modalità 10
+più sotto. Come `tuning.js`, se manca `main.js` usa uno stub e la modalità 10
+resta carta vuota.
 
 `tuning.js` non tocca né GL né `state`: passa tutto per la stringa serializzata
 del permalink, ed è per questo che l'annulla può essere una pila di stringhe.
@@ -81,7 +86,7 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   velocità 0 (vale anche per le modalità 8 e 9). Un preset nuovo che dipende
   dall'orientamento deve fare lo stesso.
 - **Un preset nominato è un permalink, non un secondo tipo di stato.**
-  `NAMED_PRESETS` in [main.js](main.js#L295) tiene stringhe nello stesso formato
+  `NAMED_PRESETS` in [main.js](main.js#L328) tiene stringhe nello stesso formato
   che `serialize()` scrive, e sceglierne una passa per `deserialize` +
   `applyState`, cioè per la stessa strada dell'hash. Non aggiungere un percorso
   parallelo che scriva su `state`: si perderebbero il ri-clamp delle iterazioni
@@ -96,12 +101,12 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   condividerne una sola: se la sposti, spostala in entrambi.
 - **`preserveDrawingBuffer` è disattivato di proposito** (costa a ogni frame).
   Quindi l'export deve disegnare e *copiare* nello stesso task: `runExport()` in
-  [main.js](main.js#L634) fa `render()` e subito un `drawImage` su una canvas 2D,
+  [main.js](main.js#L701) fa `render()` e subito un `drawImage` su una canvas 2D,
   ed è quella copia che poi va a `toBlob`. Passare la canvas GL direttamente
   all'encoder funziona per caso — finché nessuno ridimensiona il buffer prima
   che l'encoder legga. Se tocchi l'export, la copia resta.
 - **L'export non ha niente a che vedere con la finestra.** `exportPlan()` in
-  [main.js](main.js#L595) calcola una dimensione a partire dal lato lungo scelto
+  [main.js](main.js#L662) calcola una dimensione a partire dal lato lungo scelto
   nel pannello (conservando l'aspetto della finestra, perché lo shader mappa uv
   su `min(resolution)` e un rapporto diverso reinquadrerebbe la scena invece di
   ingrandirla) e la moltiplica per i campioni per pixel; `setBufferExact()` dà a
@@ -115,11 +120,11 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   livelli sopravvivono, quindi un export a 4096 px del mihrab ha viticci che
   sullo schermo non c'erano. Vale la pena saperlo prima di inseguire una
   differenza fra schermo e PNG credendola un bug.
-- **`MODE_ITER_MAX`** in [main.js](main.js#L148) deve restare allineato ai bound
+- **`MODE_ITER_MAX`** in [main.js](main.js#L166) deve restare allineato ai bound
   dei loop nello shader. Se cambi il `for (int i = 0; i < N; i++)` di una
   modalità, aggiorna anche la voce corrispondente, altrimenti lo slider ha una
   coda inerte.
-- **`MODE_UI`** in [main.js](main.js#L216) dice cosa ogni modalità fa degli
+- **`MODE_UI`** in [main.js](main.js#L229) dice cosa ogni modalità fa degli
   slider, e `syncPanel()` lo applica: `inert` spegne e sbiadisce un controllo
   che lo shader non legge, `names` gli dà il nome che quella modalità gli dà
   davvero (in modalità 8 «Petali» è il seme del piatto), `upright` marca le
@@ -129,7 +134,10 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   scritto sotto un'altra modalità si ripristina intero. Regola: se una modalità
   nuova ignora un uniform, mettilo in `inert` invece di lasciare la manopola a
   fingere; se lo legge come altro, dagli il nome in `names`. `bloom` non va mai
-  in `inert`: nelle modalità 0–7 passa comunque dal tonemap di `main()`.
+  in `inert`: nelle modalità 0–7 passa comunque dal tonemap di `main()`. Per un
+  controllo che legge *una sola* modalità c'è il rovescio, `ONLY_IN`: «Modulo»
+  sta lì come `{ module: [10] }` invece che in dieci liste `inert`, e `isInert`
+  guarda entrambi.
 - **Il flag `restoring`** sopprime l'applicazione dei preset e la riscrittura
   dell'URL mentre si carica uno stato. Ogni nuovo percorso che chiama
   `setControl` o `applyMode` durante un restore deve rispettarlo.
@@ -143,13 +151,13 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   scrivendo nel DOM **senza** dispatchare: altrimenti l'URL verrebbe riscritto
   sessanta volte al secondo. Oltre i 300 s la manopola si ferma in fondo e il
   numero continua: la manopola può bloccarsi, il readout non può mentire.
-- **`t`, `h` e `k` sono arrivati dopo i primi permalink condivisi.** `HASH_LATE`
-  in [main.js](main.js#L687) dà loro un valore di default quando mancano
+- **`t`, `h`, `k` e `o` sono arrivati dopo i primi permalink condivisi.** `HASH_LATE`
+  in [main.js](main.js#L754) dà loro un valore di default quando mancano
   dall'hash, così un vecchio URL rende come rendeva invece di ereditare tinta e
   orologio dalla vista precedente. Ogni chiave nuova va aggiunta lì.
 - **La traccia del campo visivo è esponenziale.** `min`/`max` di `#zoom`
   nell'HTML sono unità di traccia, non valori di zoom: la conversione sta tutta
-  in `SLIDERS`, `toSlider` e `fromSlider` ([main.js](main.js#L164)), e chi chiama
+  in `SLIDERS`, `toSlider` e `fromSlider` ([main.js](main.js#L177)), e chi chiama
   `setControl` parla sempre in valori. Effetto collaterale accettato: un valore
   che arriva dall'hash viene riquantizzato dello 0.2% circa (`z=2.8` torna
   `2.801`). Se aggiungi un'altra traccia logaritmica, dichiarala lì e basta.
@@ -160,9 +168,12 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   vista da cui vieni, così ci torni con l'annulla.
 - **Il trim di colore sta solo in `main()`, dopo il tonemap.** `trim()` ruota la
   tinta attorno all'asse dei grigi e scala la saturazione: si applica a tutte le
-  modalità, comprese le due a inchiostro, dove muove anche la carta (voluto: lo
+  modalità, comprese quelle a inchiostro, dove muove anche la carta (voluto: lo
   stesso piatto su carta calda o fredda sono due poster). Una modalità non deve
-  averne una copia sua, come per tonemap e vignette.
+  averne una copia sua, come per tonemap e vignette. L'unico altro posto in cui
+  gira è lo shader dei tratti di brush.js, che riceve la stessa funzione da
+  shader.js (`TRIM`): è lineare, quindi applicarla a ogni tratto equivale ad
+  applicarla all'immagine finita.
 - **Un controllo bloccato col lucchetto è fuori da Random e da Varia**, e i due
   rispettano anche `inert` e `upright`: una modalità con un alto non riceve mai
   una velocità da nessuno dei due. I lucchetti stanno in `localStorage` e non
@@ -208,8 +219,73 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   si hanno tre corone larghe invece di un dischetto perso nella carta. Se ci
   aggiungi qualcosa fuori, tienilo entro il finale di bordo (r ≈ 1.46), che è
   ciò che il campo visivo 3.2 del preset inquadra.
+- **La modalità 10 è l'unica con memoria, e la memoria non sta nell'hash.** È
+  un disegno a mano, dallo sketch P_2_3_4_01 di *Generative Gestaltung*:
+  [brush.js](brush.js) registra i percorsi del puntatore e li tiene in
+  `localStorage` sotto `fractal-mandala-drawing-v1`. Il permalink porta solo
+  l'aspetto (passo, veli, larghezza, modulo, palette) e un preset nominato non
+  tocca mai il disegno. Gli stampi non si salvano: si ricavano dai percorsi,
+  quindi cambiare «Passo» o «Veli» ridisegna tutto come se fosse stato fatto
+  così.
+- **Un tratto si rigioca identico solo se il generatore vede campioni, non il
+  puntatore.** `tick()` campiona una volta per frame, come lo sketch, anche a
+  puntatore fermo finché gli inseguitori non arrivano; arrotonda a cinque
+  decimali e passa il campione a `feed()`. Dopo un ricarico gli stessi numeri
+  ripassano dalla stessa funzione, e l'immagine è identica al pixel (verificato).
+  Logica nuova del pennello va in `feed()`, mai nei gestori degli eventi. Ogni
+  tratto ricorda lo zoom a cui è stato fatto (`z`), e passo, larghezza e
+  spessore lo moltiplicano: un tratto fatto da vicino non è più grossolano.
+- **Il disegno si accumula in una texture, e la sua chiave decide quando
+  rifarlo.** `render()` di brush.js disegna nella texture solo gli stampi nuovi
+  e la compone sopra la carta che `main()` ha già dipinto. La rifà da zero
+  quando cambia la chiave (dimensione, pan, zoom, rotazione, larghezza, modulo,
+  opacità, palette, tinta, saturazione) o `rev` (annulla, cancella, passo,
+  veli). Un parametro nuovo che cambia l'aspetto va nella chiave, altrimenti si
+  vede solo sui tratti successivi. Se la GPU non concede la texture (un export
+  enorme) gli stampi vanno dritti sulla carta: più lento, stessa immagine.
+- **brush.js ha programmi e attributi suoi.** WebGL 1 non ha VAO, quindi gli
+  attributi abilitati sono stato globale: `render()` in main.js si riprende
+  programma, buffer e `a_pos` a ogni frame, e brush.js disabilita i suoi dopo
+  ogni draw. Colori premoltiplicati (`ONE, ONE_MINUS_SRC_ALPHA`) sia nella
+  texture sia nella composizione. Il suo shader non riceve l'header di
+  `buildGL()`, quindi niente `FW()`: l'antialiasing usa `u_px`, la dimensione
+  del pixel, che vale anche nell'export.
+- **Palette e trim sono condivisi per interpolazione.** `INK` e `TRIM` in
+  shader.js sono stringhe inserite in `FRAG_BODY` con `${...}` ed esportate, e
+  brush.js le inserisce nel suo shader. Una palette nuova si scrive una volta,
+  in `INK` e in `pickPalette`. Da qui anche la regola dei backtick: uno dentro un
+  commento GLSL chiude il template literal, e il sintomo non è un errore GLSL ma
+  `shader.js` che non si carica.
+- **In modalità 10 trascinare disegna.** Spazio+trascina, tasto centrale e due
+  dita spostano la vista; Maiusc+trascina ruota; Backspace toglie l'ultimo
+  tratto e Canc cancella tutto (Backspace riporta indietro anche la
+  cancellazione, finché la pagina è aperta); il doppio click non va a schermo
+  intero. L'annulla dei tratti è separato da ↶ ↷, che camminano sul permalink.
+  `symmetry`, `speed` e `time` sono in `inert`, e `frame()` non anima una
+  modalità con la velocità inerte: per questo `clientToScene` in main.js e il
+  vertex shader di brush.js possono ignorare la rotazione da orologio di
+  `main()`.
+- **«Modulo» (`o` nell'hash) segue l'ordine dei file SVG dello sketch**, 01–09,
+  e quell'indice è anche il ramo nello shader di brush.js. Riordinare il menu o
+  i rami cambia l'aspetto di ogni permalink già condiviso: un modulo nuovo va in
+  fondo.
+- **Una modalità pesante può rallentare tutte le altre.** Il backend D3D11 di
+  ANGLE (Chrome ed Edge su Windows) può portare fuori dal ramo del dispatch il
+  lavoro di preparazione di una modalità e pagarlo su ogni pixel di ogni
+  modalità. È successo con la prima modalità 10, uno spirografo calcolato nello
+  shader poi sostituito dal disegno a mano: la 9 era passata da 20 a 30 ms per
+  frame a 1440×900 su una GPU Intel integrata senza mai chiamarla, e la
+  compilazione a ogni caricamento da 1,7 a 2,6 s. La cura per il primo costo era
+  una guardia in testa alla funzione, `if (abs(u_mode - N) > 0.5) return
+  vec3(0.0);`; il secondo non si toglie. Una modalità nuova con cicli va
+  misurata sul tempo di una modalità *vecchia*, prima e dopo.
+- **Gli screenshot headless perdono il contesto WebGL in modalità 10.** Chrome
+  headless sulla GPU D3D11 a volte perde il contesto mentre cattura una pagina
+  della modalità 10 con dei tratti: 2–3 volte su 5 su una Intel integrata, 0 su
+  4 con la finestra visibile e 0 su 3 in SwiftShader. È il percorso di cattura,
+  non l'app: si rifà lo scatto, o si usa `--headed`.
 - **La risoluzione cala mentre la scena si muove.** `setBuffer()` in
-  [main.js](main.js#L348) ridimensiona il drawing buffer: `renderScale` scende
+  [main.js](main.js#L387) ridimensiona il drawing buffer: `renderScale` scende
   fino a 0.45 quando le frame superano i 24 ms e risale quando ne bastano 13, ma
   solo durante l'animazione, un drag o uno slider. Passati 220 ms dall'ultimo
   input il buffer torna a piena risoluzione e disegna una frame nitida. Quindi
@@ -221,7 +297,9 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
   `state.time` e sporca la scena solo se `state.speed !== 0`: le modalità 7, 8 e
   9 sono ferme per preset e senza quel controllo ridisegnano un'immagine
   identica sessanta volte al secondo. Lo slider «Tempo» resta comunque vivo: è
-  l'unico modo di muoverle, e passa da `bindRange`, non da `frame()`.
+  l'unico modo di muoverle, e passa da `bindRange`, non da `frame()`. Una
+  modalità che ha `speed` in `inert` (la 10) non anima mai, qualunque valore
+  abbia lasciato sullo slider un permalink di un'altra modalità.
 - **Il rendering è on-demand**: `render()` esce subito se `dirty` è falso. Ogni
   cambiamento di stato deve chiamare `markDirty()`, altrimenti non si vede nulla
   finché l'animazione non è in pausa... e in pausa non si vede proprio.
@@ -245,14 +323,19 @@ Non duplica le inquadrature, le importa dalla prima e le rinomina.
 
 1. Scrivi `modeNuova(vec2 uv, float t)` in [shader.js](shader.js), accanto alle
    altre, con lo stesso commento di intestazione a banda.
+   Se ha cicli, misurala come dice la nota su ANGLE e, se rallenta le altre,
+   dalle in testa la guardia sul proprio numero.
 2. Aggiungi il ramo in `main()` (catena `u_mode < N.5`).
 3. Aggiungi l'`<option>` in [index.html](index.html) con il valore numerico.
 4. Aggiungi la voce in `MODE_ITER_MAX`, in `modePresets` e in `MODE_UI` in
-   [main.js](main.js): quest'ultima dice quali slider la modalità ignora
+   [main.js](main.js), e alza `MODE_LAST`, che è il tetto a cui `applyState`
+   riporta la `m` dell'hash. `MODE_UI` dice quali slider la modalità ignora
    (`inert`), come chiama quelli che usa con un altro significato (`names`), se
    ha un alto (`upright`) e in che fascia rende (`zones`, la banda dipinta sulla
    traccia).
-5. Aggiungi uno shot in `shotkit.config.mjs` con i parametri che la mostrano.
+5. Aggiungi uno shot in `shotkit.config.mjs` con i parametri che la mostrano, e
+   misura il costo per frame di una modalità esistente prima e dopo (vedi la
+   nota su ANGLE sopra).
 6. Aggiungi una voce in `NAMED_PRESETS`, con il `t` che serve se la modalità è
    una di quelle che a tempo zero non hanno ancora risolto.
 

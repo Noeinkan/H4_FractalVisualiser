@@ -237,6 +237,9 @@ input[type="range"]::-moz-range-thumb {
   gap: 6px;
   margin-top: 4px;
 }
+/* `display: flex` above would beat the browser's own rule for [hidden], and
+   the mode-10 row would show in every mode. */
+#controls [hidden] { display: none; }
 .row button {
   flex: 1 1 auto;
   min-width: 54px;

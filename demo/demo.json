@@ -1,0 +1,82 @@
+{
+  "manifestVersion": 1,
+
+  "slug": "h4-fractal-visualiser",
+  "repo": "H4_FractalVisualiser",
+  "name": "Fractal Mandala Visualiser",
+
+  "archetype": "static",
+  "kind": "sandbox",
+  "status": "planned",
+
+  "url": null,
+  "note": "No sign-up, 45 minutes per visitor. Needs WebGL; the control panel is in Italian.",
+  "noteIt": "Nessuna registrazione, 45 minuti per visitatore. Serve un browser con WebGL.",
+
+  "access": {
+    "mode": "open",
+    "verification": null,
+    "oneTrialPer": null,
+    "tracking": null,
+    "admin": null,
+    "privacy": null,
+    "mail": null,
+    "secrets": ["SITE_PASSWORD"],
+    "killSwitch": null
+  },
+
+  "session": {
+    "minutes": 45,
+    "once": true,
+    "clock": "wall clock from first entry, on the server; resumable inside the window",
+    "keyedOn": "random id in a durable HttpOnly cookie, plus 3 sessions per IP per UTC day as a backstop",
+    "firmness": "soft: a private window gets another session, and the source is public on GitHub under MIT",
+    "store": "demo_sessions table, SQLite (node:sqlite) on the demo-data volume",
+    "retentionDays": 90,
+    "atEnd": "the open tab reloads onto the server's 'La demo è finita' page, which names what they saw and links the Noein contact page; the app files stop being served to that session; no restart",
+    "cleanup": "nothing to delete (an entry makes nothing on the server); identity rows are purged lazily after retentionDays",
+    "env": ["DEMO_SESSION_MINUTES=45", "DEMO_SESSIONS_PER_IP_PER_DAY=3", "DEMO_RETENTION_DAYS=90"]
+  },
+
+  "tiers": {
+    "open": ["all render modes", "every slider and palette", "named presets and saved views", "permalinks", "Random and Varia", "undo, redo and A/B", "PNG export"],
+    "metered": [],
+    "locked": [],
+    "removed": [],
+    "decidedBy": "owner, 2026-09-17: a server-enforced 45-minute session rather than no time box; the full version at / behind a password so the limit cannot be stepped around; everything inside the demo open, since nothing costs per use"
+  },
+
+  "data": {
+    "source": "none: every image is computed in the visitor's browser from the parameters in the URL hash",
+    "snapshot": null,
+    "refresh": "Nothing to refresh. The seeded first view is SEED in demo/demo.js, copied from «Giardino di smeraldo» in NAMED_PRESETS."
+  },
+
+  "killSwitch": {
+    "server": "DEMO_MODE=false",
+    "client": null,
+    "note": "In /opt/sites/fractal/.env. False, or unset, and the site goes back to what it was before the demo: the whole visualiser public at /, no password, no clock, and /demo redirecting to /."
+  },
+
+  "limits": {
+    "globalDailyActions": null,
+    "perIpPerHour": null
+  },
+
+  "resets": "Rendering runs entirely in the visitor's tab, so one visitor cannot touch another's view. «Ricomincia» on the banner puts the seeded view back (Ctrl+Z undoes it); saved views and padlocks, which live in that browser's localStorage, are kept.",
+  "costPerVisit": "none beyond serving about 130 KB of files; the rendering runs on the visitor's GPU",
+
+  "runLocally": "PowerShell: $env:DEMO_MODE='true'; $env:SITE_PASSWORD='prova'; npm start — then http://127.0.0.1:8080/demo",
+  "shots": [
+    "h4-fractal-visualiser.jpg",
+    "h4-fractal-visualiser-muqarnas.jpg",
+    "h4-fractal-visualiser-mihrab.jpg",
+    "h4-fractal-visualiser-henna.jpg",
+    "h4-fractal-visualiser-vault.jpg",
+    "h4-fractal-visualiser-shamsa.jpg",
+    "h4-fractal-visualiser-girih.jpg",
+    "h4-fractal-visualiser-julia.jpg"
+  ],
+  "registeredOnLanding": false,
+  "updatedAt": "2026-09-17"
+}
